@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qrents Pro — Manajemen Properti</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🏠</div>
+    <div>
+      <div class="logo-title">Qrents</div>
+      <div class="logo-sub">Pro Dashboard</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="#" class="nav-item active" data-page="dashboard">
+      <span class="nav-icon">◈</span><span>Dashboard</span>
+    </a>
+    <a href="#" class="nav-item" data-page="properties">
+      <span class="nav-icon">⌂</span><span>Properti</span>
+    </a>
+    <a href="#" class="nav-item" data-page="tenants">
+      <span class="nav-icon">👤</span><span>Penyewa</span>
+    </a>
+    <a href="#" class="nav-item" data-page="income">
+      <span class="nav-icon">₿</span><span>Pendapatan</span>
+    </a>
+    <a href="#" class="nav-item" data-page="expenses">
+      <span class="nav-icon">📋</span><span>Pengeluaran</span>
+    </a>
+    <a href="#" class="nav-item" data-page="reports">
+      <span class="nav-icon">📊</span><span>Laporan</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="user-avatar">P</div>
+      <div>
+        <div class="user-name" id="sidebarUserName">Pemilik</div>
+        <div class="user-role">Administrator</div>
+      </div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="logoutUser()">Logout</button>
+  </div>
+</aside>
+
+<!-- MOBILE TOGGLE -->
+<button class="mobile-toggle" id="mobileToggle">☰</button>
+
+<!-- MAIN CONTENT -->
+<main class="main" id="main">
+
+  <!-- ===== LOGIN PAGE ===== -->
+  <section class="page" id="page-login">
+    <div class="login-page">
+      <div class="login-card">
+        <div class="login-brand">
+          <div class="logo-icon">🏠</div>
+          <h1>RumahSewa</h1>
+          <p>Masuk untuk mengelola data properti Anda</p>
+        </div>
+        <form id="loginForm">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="loginUsername" placeholder="admin" required>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" required>
+          </div>
+          <div class="modal-actions login-actions">
+            <button type="submit" class="btn btn-primary">Masuk</button>
+            <button type="button" class="btn btn-outline" onclick="fillDemoAccount()">Gunakan akun demo</button>
+          </div>
+          <div class="small-note">
+            Belum punya akun? <a href="#" onclick="showRegisterForm(); return false;">Buat akun</a>
+          </div>
+        </form>
+
+        <form id="registerForm" class="hidden">
+          <div class="form-group">
+            <label>Nama</label>
+            <input type="text" id="regName" placeholder="Nama lengkap" required>
+          </div>
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="regUsername" placeholder="username" required>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="regPassword" placeholder="••••••••" required>
+          </div>
+          <div class="form-group">
+            <label>Konfirmasi Password</label>
+            <input type="password" id="regPasswordConfirm" placeholder="••••••••" required>
+          </div>
+          <div class="modal-actions login-actions">
+            <button type="submit" class="btn btn-primary">Daftar</button>
+            <button type="button" class="btn btn-outline" onclick="showLoginForm()">Kembali</button>
+          </div>
+          <div class="small-note">
+            Sudah punya akun? <a href="#" onclick="showLoginForm(); return false;">Masuk</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== DASHBOARD PAGE ===== -->
+  <section class="page active" id="page-dashboard">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">Ringkasan keuangan properti Anda</p>
+      </div>
+      <div class="header-date" id="headerDate"></div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card accent-green">
+        <div class="stat-label">Total Pendapatan Bulan Ini</div>
+        <div class="stat-value" id="stat-income">Rp 0</div>
+        <div class="stat-sub" id="stat-income-sub">0 transaksi</div>
+      </div>
+      <div class="stat-card accent-red">
+        <div class="stat-label">Total Pengeluaran Bulan Ini</div>
+        <div class="stat-value" id="stat-expense">Rp 0</div>
+        <div class="stat-sub" id="stat-expense-sub">0 transaksi</div>
+      </div>
+      <div class="stat-card accent-gold">
+        <div class="stat-label">Keuntungan Bersih</div>
+        <div class="stat-value" id="stat-profit">Rp 0</div>
+        <div class="stat-sub" id="stat-profit-sub">bulan ini</div>
+      </div>
+      <div class="stat-card accent-blue">
+        <div class="stat-label">Properti Aktif</div>
+        <div class="stat-value" id="stat-properties">0</div>
+        <div class="stat-sub" id="stat-occupied">0 terisi</div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="card">
+        <div class="card-header">
+          <h3>Pendapatan 6 Bulan Terakhir</h3>
+        </div>
+        <div class="chart-container">
+          <canvas id="incomeChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Status Properti</h3>
+        </div>
+        <div id="propertyStatusList" class="property-status-list"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Transaksi Terbaru</h3>
+        <a href="#" class="card-link" data-page="income">Lihat Semua →</a>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Tanggal</th><th>Properti</th><th>Penyewa</th><th>Keterangan</th><th>Jumlah</th><th>Tipe</th></tr>
+          </thead>
+          <tbody id="recentTransactions"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PROPERTIES PAGE ===== -->
+  <section class="page" id="page-properties">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Manajemen Properti</h1>
+        <p class="page-subtitle">Kelola data rumah sewaan Anda</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal('modalProperty')">+ Tambah Properti</button>
+    </div>
+
+    <div class="cards-grid" id="propertiesGrid"></div>
+  </section>
+
+  <!-- ===== TENANTS PAGE ===== -->
+  <section class="page" id="page-tenants">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Data Penyewa</h1>
+        <p class="page-subtitle">Kelola informasi penyewa aktif</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal('modalTenant')">+ Tambah Penyewa</button>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Nama</th><th>Properti</th><th>No. HP</th><th>Mulai Sewa</th><th>Akhir Sewa</th><th>Sewa/Bulan</th><th>Status</th><th>Aksi</th></tr>
+          </thead>
+          <tbody id="tenantsTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== INCOME PAGE ===== -->
+  <section class="page" id="page-income">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Pendapatan</h1>
+        <p class="page-subtitle">Catat dan kelola pemasukan sewa</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal('modalIncome')">+ Catat Pendapatan</button>
+    </div>
+
+    <div class="filter-bar">
+      <select id="filterIncomeProperty" onchange="renderIncome()">
+        <option value="">Semua Properti</option>
+      </select>
+      <select id="filterIncomeMonth" onchange="renderIncome()">
+        <option value="">Semua Bulan</option>
+      </select>
+      <select id="filterIncomeYear" onchange="renderIncome()">
+        <option value="">Semua Tahun</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Tanggal</th><th>Properti</th><th>Penyewa</th><th>Keterangan</th><th>Jumlah</th><th>Metode</th><th>Aksi</th></tr>
+          </thead>
+          <tbody id="incomeTable"></tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <span>Total: </span><strong id="incomeTotalDisplay">Rp 0</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== EXPENSES PAGE ===== -->
+  <section class="page" id="page-expenses">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Pengeluaran</h1>
+        <p class="page-subtitle">Catat biaya perawatan dan operasional</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal('modalExpense')">+ Catat Pengeluaran</button>
+    </div>
+
+    <div class="filter-bar">
+      <select id="filterExpenseProperty" onchange="renderExpenses()">
+        <option value="">Semua Properti</option>
+      </select>
+      <select id="filterExpenseMonth" onchange="renderExpenses()">
+        <option value="">Semua Bulan</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Tanggal</th><th>Properti</th><th>Kategori</th><th>Keterangan</th><th>Jumlah</th><th>Aksi</th></tr>
+          </thead>
+          <tbody id="expensesTable"></tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <span>Total: </span><strong id="expenseTotalDisplay">Rp 0</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== REPORTS PAGE ===== -->
+  <section class="page" id="page-reports">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Laporan Keuangan</h1>
+        <p class="page-subtitle">Analisis per properti dan periode</p>
+      </div>
+      <button class="btn btn-outline" onclick="exportReport()">⬇ Export CSV</button>
+    </div>
+
+    <div class="filter-bar">
+      <select id="reportYear" onchange="renderReports()">
+      </select>
+    </div>
+
+    <div class="stats-grid" style="margin-bottom:2rem;">
+      <div class="stat-card accent-green">
+        <div class="stat-label">Total Pendapatan Tahunan</div>
+        <div class="stat-value" id="rep-income">Rp 0</div>
+      </div>
+      <div class="stat-card accent-red">
+        <div class="stat-label">Total Pengeluaran Tahunan</div>
+        <div class="stat-value" id="rep-expense">Rp 0</div>
+      </div>
+      <div class="stat-card accent-gold">
+        <div class="stat-label">Keuntungan Bersih</div>
+        <div class="stat-value" id="rep-profit">Rp 0</div>
+      </div>
+      <div class="stat-card accent-blue">
+        <div class="stat-label">Tingkat Hunian</div>
+        <div class="stat-value" id="rep-occupancy">0%</div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="card">
+        <div class="card-header"><h3>Pendapatan per Bulan</h3></div>
+        <div class="chart-container"><canvas id="reportChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Ringkasan per Properti</h3></div>
+        <div id="reportPropertyTable"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ====== MODALS ====== -->
+
+<!-- Modal Properti -->
+<div class="modal-overlay" id="modalProperty">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalPropertyTitle">Tambah Properti</h2>
+      <button class="modal-close" onclick="closeModal('modalProperty')">✕</button>
+    </div>
+    <form id="formProperty" onsubmit="saveProperty(event)">
+      <input type="hidden" id="propertyId">
+      <div class="form-group">
+        <label>Nama Properti *</label>
+        <input type="text" id="propertyName" placeholder="cth: Rumah Jl. Melati No.5" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Alamat *</label>
+          <input type="text" id="propertyAddress" placeholder="Alamat lengkap" required>
+        </div>
+        <div class="form-group">
+          <label>Kota</label>
+          <input type="text" id="propertyCity" placeholder="Jakarta">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Harga Sewa/Bulan (Rp) *</label>
+          <input type="number" id="propertyRent" placeholder="3500000" required>
+        </div>
+        <div class="form-group">
+          <label>Tipe Properti</label>
+          <select id="propertyType">
+            <option>Rumah</option>
+            <option>Kos</option>
+            <option>Ruko</option>
+            <option>Kontrakan</option>
+            <option>Apartemen</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Fasilitas / Catatan</label>
+        <textarea id="propertyNotes" placeholder="2KT, 1KM, Air PDAM, listrik token..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="propertyStatus">
+          <option value="kosong">Kosong</option>
+          <option value="terisi">Terisi</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modalProperty')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Penyewa -->
+<div class="modal-overlay" id="modalTenant">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTenantTitle">Tambah Penyewa</h2>
+      <button class="modal-close" onclick="closeModal('modalTenant')">✕</button>
+    </div>
+    <form id="formTenant" onsubmit="saveTenant(event)">
+      <input type="hidden" id="tenantId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nama Lengkap *</label>
+          <input type="text" id="tenantName" required placeholder="Budi Santoso">
+        </div>
+        <div class="form-group">
+          <label>No. HP *</label>
+          <input type="text" id="tenantPhone" required placeholder="081234567890">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="tenantEmail" placeholder="budi@email.com">
+        </div>
+        <div class="form-group">
+          <label>No. KTP</label>
+          <input type="text" id="tenantKtp" placeholder="3201...">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Properti *</label>
+        <select id="tenantProperty" required></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tanggal Mulai *</label>
+          <input type="date" id="tenantStart" required>
+        </div>
+        <div class="form-group">
+          <label>Tanggal Akhir</label>
+          <input type="date" id="tenantEnd">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Harga Sewa/Bulan (Rp) *</label>
+          <input type="number" id="tenantRent" required placeholder="3500000">
+        </div>
+        <div class="form-group">
+          <label>Deposit (Rp)</label>
+          <input type="number" id="tenantDeposit" placeholder="3500000">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Catatan</label>
+        <textarea id="tenantNotes" placeholder="Catatan tambahan..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modalTenant')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Pendapatan -->
+<div class="modal-overlay" id="modalIncome">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalIncomeTitle">Catat Pendapatan</h2>
+      <button class="modal-close" onclick="closeModal('modalIncome')">✕</button>
+    </div>
+    <form id="formIncome" onsubmit="saveIncome(event)">
+      <input type="hidden" id="incomeId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tanggal *</label>
+          <input type="date" id="incomeDate" required>
+        </div>
+        <div class="form-group">
+          <label>Properti *</label>
+          <select id="incomeProperty" required onchange="onIncomePropertyChange()"></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Penyewa</label>
+          <select id="incomeTenant"><option value="">— Pilih Penyewa —</option></select>
+        </div>
+        <div class="form-group">
+          <label>Jumlah (Rp) *</label>
+          <input type="number" id="incomeAmount" required placeholder="3500000">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Kategori</label>
+          <select id="incomeCategory">
+            <option>Sewa Bulanan</option>
+            <option>Deposit</option>
+            <option>Denda Keterlambatan</option>
+            <option>Biaya Tambahan</option>
+            <option>Lainnya</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Metode Pembayaran</label>
+          <select id="incomeMethod">
+            <option>Transfer Bank</option>
+            <option>Tunai</option>
+            <option>QRIS</option>
+            <option>OVO</option>
+            <option>GoPay</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Keterangan</label>
+        <input type="text" id="incomeNote" placeholder="Sewa bulan Oktober 2025...">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modalIncome')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Pengeluaran -->
+<div class="modal-overlay" id="modalExpense">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalExpenseTitle">Catat Pengeluaran</h2>
+      <button class="modal-close" onclick="closeModal('modalExpense')">✕</button>
+    </div>
+    <form id="formExpense" onsubmit="saveExpense(event)">
+      <input type="hidden" id="expenseId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tanggal *</label>
+          <input type="date" id="expenseDate" required>
+        </div>
+        <div class="form-group">
+          <label>Properti *</label>
+          <select id="expenseProperty" required></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Kategori *</label>
+          <select id="expenseCategory" required>
+            <option>Perbaikan & Renovasi</option>
+            <option>Pajak PBB</option>
+            <option>Listrik / Air</option>
+            <option>Kebersihan</option>
+            <option>Asuransi</option>
+            <option>Biaya Agen</option>
+            <option>Perabot</option>
+            <option>Lainnya</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Jumlah (Rp) *</label>
+          <input type="number" id="expenseAmount" required placeholder="500000">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Keterangan *</label>
+        <input type="text" id="expenseNote" placeholder="Perbaikan atap bocor..." required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modalExpense')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="loginHandler-api.js"></script>
+<script src="app-api.js"></script>
+</body>
+</html>
