@@ -394,21 +394,106 @@ async function renderTenants() {
       const isActive = !end || end >= now;
       const daysLeft = end ? Math.ceil((end - now) / (1000*60*60*24)) : null;
       return `
-        <tr>
-          <td>${t.name}</td>
+        <tr class="tenant-row" onclick="showTenantPayments('${t._id}', '${(t.name||'').replace(/'/g,'\\\'')}')" style="cursor:pointer;" title="Klik untuk lihat riwayat pembayaran">
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span>${t.name}</span>
+              <span class="tenant-row-hint">📋</span>
+            </div>
+          </td>
           <td>${t.propertyId?.name || '—'}</td>
           <td>${t.phone}</td>
           <td>${fmtDate(t.start)}</td>
           <td>${fmtDate(t.end)}${daysLeft !== null && daysLeft >= 0 && daysLeft <= 30 ? `<br><small style="color:var(--red)">⚠ ${daysLeft} hari lagi</small>` : ''}</td>
           <td>${fmt(t.rent)}</td>
           <td><span class="status-badge ${isActive ? 'terisi' : 'kosong'}">${isActive ? 'Aktif' : 'Habis'}</span></td>
-          <td>
+          <td onclick="event.stopPropagation()">
             <button class="btn btn-outline btn-sm" onclick="editTenant('${t._id}')">✏</button>
             <button class="btn btn-danger btn-sm" onclick="deleteTenant('${t._id}')">🗑</button>
           </td>
         </tr>
       `;
     }).join('');
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function showTenantPayments(tenantId, tenantName) {
+  try {
+    document.getElementById('modalPaymentsTitle').textContent = `Riwayat Pembayaran — ${tenantName}`;
+    const content = document.getElementById('tenantPaymentsContent');
+    content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-title">Memuat data...</div></div>';
+    openModal('modalTenantPayments');
+
+    const allIncome = await API.get('/income');
+    const payments = allIncome.filter(i => i.tenantId && i.tenantId._id === tenantId);
+
+    if (payments.length === 0) {
+      content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-title">Belum ada riwayat pembayaran</div><div class="empty-state-sub">Tidak ditemukan transaksi untuk penyewa ini</div></div>';
+      return;
+    }
+
+    // Group by year then month
+    const grouped = {};
+    payments.forEach(p => {
+      const d = new Date(p.date);
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      if (!grouped[year]) grouped[year] = {};
+      if (!grouped[year][month]) grouped[year][month] = [];
+      grouped[year][month].push(p);
+    });
+
+    const years = Object.keys(grouped).sort((a, b) => b - a);
+    let html = '';
+
+    years.forEach(year => {
+      const yearTotal = Object.values(grouped[year]).flat().reduce((s, p) => s + p.amount, 0);
+      html += `
+        <div class="payment-year-section">
+          <div class="payment-year-header">
+            <span class="payment-year-label">${year}</span>
+            <span class="payment-year-total">${fmt(yearTotal)}</span>
+          </div>
+      `;
+
+      const months = Object.keys(grouped[year]).sort((a, b) => b - a);
+      months.forEach(month => {
+        const monthPayments = grouped[year][month].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const monthTotal = monthPayments.reduce((s, p) => s + p.amount, 0);
+        html += `
+          <div class="payment-month-section">
+            <div class="payment-month-header">
+              <span class="payment-month-label">${fullMonth[parseInt(month)]}</span>
+              <span class="payment-month-total">${fmt(monthTotal)}</span>
+            </div>
+            ${monthPayments.map(p => `
+              <div class="payment-item">
+                <div class="payment-item-left">
+                  <div class="payment-item-date">${fmtDate(p.date)}</div>
+                  <div class="payment-item-desc">${p.note || p.category || 'Pembayaran'}</div>
+                  <div class="payment-item-meta">${p.method || ''} ${p.propertyId?.name ? '· ' + p.propertyId.name : ''}</div>
+                </div>
+                <div class="payment-item-amount">${fmt(p.amount)}</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+    });
+
+    const grandTotal = payments.reduce((s, p) => s + p.amount, 0);
+    html += `
+      <div class="payment-grand-total">
+        <span>Total Keseluruhan</span>
+        <span>${fmt(grandTotal)}</span>
+      </div>
+    `;
+
+    content.innerHTML = html;
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
   }

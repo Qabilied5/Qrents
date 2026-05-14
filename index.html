@@ -82,7 +82,7 @@
         <div class="user-role">Administrator</div>
       </div>
     </div>
-    <button class="btn btn-outline btn-sm" onclick="logoutUser()">Logout</button>
+    <button class="btn btn-outline btn-sm sidebar-logout-btn" onclick="logoutUser()">Logout</button>
   </div>
 </aside>
 
@@ -96,9 +96,25 @@
     <span class="mobile-header-title">Qrents</span>
   </div>
   <div class="mobile-header-actions">
-    <div class="mobile-header-avatar" id="mobileAvatar">P</div>
+    <div class="mobile-header-avatar" id="mobileAvatar" onclick="toggleProfileDropdown()">P</div>
   </div>
 </header>
+
+<!-- MOBILE PROFILE DROPDOWN -->
+<div class="profile-dropdown-overlay" id="profileDropdownOverlay" onclick="closeProfileDropdown()"></div>
+<div class="profile-dropdown" id="profileDropdown">
+  <div class="profile-dropdown-user">
+    <div class="profile-dropdown-avatar" id="profileDropdownAvatar">P</div>
+    <div>
+      <div class="profile-dropdown-name" id="profileDropdownName">Pemilik</div>
+      <div class="profile-dropdown-role">Administrator</div>
+    </div>
+  </div>
+  <div class="profile-dropdown-divider"></div>
+  <button class="profile-dropdown-logout" onclick="closeProfileDropdown(); logoutUser()">
+    <span>🚪</span> Keluar
+  </button>
+</div>
 
 <!-- MAIN CONTENT -->
 <main class="main" id="main">
@@ -617,6 +633,19 @@
   </div>
 </div>
 
+<!-- Modal Riwayat Pembayaran Penyewa -->
+<div class="modal-overlay" id="modalTenantPayments">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalPaymentsTitle">Riwayat Pembayaran</h2>
+      <button class="modal-close" onclick="closeModal('modalTenantPayments')">✕</button>
+    </div>
+    <div id="tenantPaymentsContent" style="padding: 20px 24px; max-height: 60vh; overflow-y: auto;">
+      <!-- Filled dynamically -->
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -708,10 +737,32 @@ document.querySelectorAll('.bottom-nav-item[data-page]').forEach(item => {
 function syncMobileHeader() {
   const sidebarName = document.getElementById('sidebarUserName');
   const mobileAvatar = document.getElementById('mobileAvatar');
+  const profileDropdownAvatar = document.getElementById('profileDropdownAvatar');
+  const profileDropdownName = document.getElementById('profileDropdownName');
   if (sidebarName && mobileAvatar) {
     const name = sidebarName.textContent || 'P';
-    mobileAvatar.textContent = name.charAt(0).toUpperCase();
+    const initial = name.charAt(0).toUpperCase();
+    mobileAvatar.textContent = initial;
+    if (profileDropdownAvatar) profileDropdownAvatar.textContent = initial;
+    if (profileDropdownName) profileDropdownName.textContent = name;
   }
+}
+
+function toggleProfileDropdown() {
+  const dropdown = document.getElementById('profileDropdown');
+  const overlay = document.getElementById('profileDropdownOverlay');
+  const isOpen = dropdown.classList.contains('open');
+  if (isOpen) {
+    closeProfileDropdown();
+  } else {
+    dropdown.classList.add('open');
+    overlay.classList.add('open');
+  }
+}
+
+function closeProfileDropdown() {
+  document.getElementById('profileDropdown').classList.remove('open');
+  document.getElementById('profileDropdownOverlay').classList.remove('open');
 }
 
 // Observe sidebar username changes
