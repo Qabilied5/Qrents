@@ -53,8 +53,19 @@
   </div>
 </aside>
 
-<!-- MOBILE TOGGLE -->
-<button class="mobile-toggle" id="mobileToggle">☰</button>
+<!-- MOBILE TOGGLE (hidden, kept for JS compatibility) -->
+<button class="mobile-toggle" id="mobileToggle" style="display:none">☰</button>
+
+<!-- MOBILE HEADER -->
+<header class="mobile-header" id="mobileHeader">
+  <div class="mobile-header-brand">
+    <div class="logo-icon">🏠</div>
+    <span class="mobile-header-title">Qrents</span>
+  </div>
+  <div class="mobile-header-actions">
+    <div class="mobile-header-avatar" id="mobileAvatar">P</div>
+  </div>
+</header>
 
 <!-- MAIN CONTENT -->
 <main class="main" id="main">
@@ -576,8 +587,115 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- BOTTOM NAV (mobile only) -->
+<nav class="bottom-nav" id="bottomNav">
+  <div class="bottom-nav-item active" data-page="dashboard" onclick="navigateTo('dashboard'); setActiveBottomNav(this)">
+    <span class="bnav-icon">◈</span>
+    <span class="bnav-label">Beranda</span>
+  </div>
+  <div class="bottom-nav-item" data-page="properties" onclick="navigateTo('properties'); setActiveBottomNav(this)">
+    <span class="bnav-icon">⌂</span>
+    <span class="bnav-label">Properti</span>
+  </div>
+  <div class="bottom-nav-fab-wrapper" id="fabWrapper">
+    <div class="bottom-nav-fab" id="fabBtn" onclick="showFabMenu()">＋</div>
+    <span class="bottom-nav-fab-label">Catat</span>
+  </div>
+  <div class="bottom-nav-item" data-page="tenants" onclick="navigateTo('tenants'); setActiveBottomNav(this)">
+    <span class="bnav-icon">👤</span>
+    <span class="bnav-label">Penyewa</span>
+  </div>
+  <div class="bottom-nav-item" data-page="reports" onclick="navigateTo('reports'); setActiveBottomNav(this)">
+    <span class="bnav-icon">📊</span>
+    <span class="bnav-label">Laporan</span>
+  </div>
+</nav>
+
+<!-- FAB Quick Menu (mobile) -->
+<div class="fab-menu-overlay" id="fabMenuOverlay" onclick="hideFabMenu()"></div>
+<div class="fab-menu" id="fabMenu">
+  <div class="fab-menu-title">Catat Transaksi</div>
+  <button class="fab-menu-item" onclick="hideFabMenu(); navigateTo('income'); setTimeout(() => openModal('modalIncome'), 200)">
+    <span class="fab-menu-icon accent-green-icon">↑</span>
+    <div>
+      <div class="fab-menu-label">Pendapatan</div>
+      <div class="fab-menu-sub">Catat pemasukan sewa</div>
+    </div>
+  </button>
+  <button class="fab-menu-item" onclick="hideFabMenu(); navigateTo('expenses'); setTimeout(() => openModal('modalExpense'), 200)">
+    <span class="fab-menu-icon accent-red-icon">↓</span>
+    <div>
+      <div class="fab-menu-label">Pengeluaran</div>
+      <div class="fab-menu-sub">Catat biaya operasional</div>
+    </div>
+  </button>
+  <button class="fab-menu-item" onclick="hideFabMenu(); navigateTo('properties'); setTimeout(() => openModal('modalProperty'), 200)">
+    <span class="fab-menu-icon accent-blue-icon">⌂</span>
+    <div>
+      <div class="fab-menu-label">Properti Baru</div>
+      <div class="fab-menu-sub">Tambah unit properti</div>
+    </div>
+  </button>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="loginHandler-api.js"></script>
 <script src="app-api.js"></script>
+
+<script>
+// ===== MOBILE BOTTOM NAV & FAB =====
+function setActiveBottomNav(el) {
+  document.querySelectorAll('.bottom-nav-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+}
+
+function showFabMenu() {
+  document.getElementById('fabMenuOverlay').classList.add('open');
+  document.getElementById('fabMenu').classList.add('open');
+  const fab = document.getElementById('fabBtn');
+  fab.textContent = '✕';
+  fab.classList.add('fab-rotating');
+}
+
+function hideFabMenu() {
+  document.getElementById('fabMenuOverlay').classList.remove('open');
+  document.getElementById('fabMenu').classList.remove('open');
+  const fab = document.getElementById('fabBtn');
+  fab.textContent = '＋';
+  fab.classList.remove('fab-rotating');
+}
+
+// Sync bottom nav with sidebar navigation
+const _origNavigateTo = typeof navigateTo === 'function' ? navigateTo : null;
+document.querySelectorAll('.bottom-nav-item[data-page]').forEach(item => {
+  // Already handled via onclick
+});
+
+// Update mobile avatar from sidebar user name
+function syncMobileHeader() {
+  const sidebarName = document.getElementById('sidebarUserName');
+  const mobileAvatar = document.getElementById('mobileAvatar');
+  if (sidebarName && mobileAvatar) {
+    const name = sidebarName.textContent || 'P';
+    mobileAvatar.textContent = name.charAt(0).toUpperCase();
+  }
+}
+
+// Observe sidebar username changes
+const observer = new MutationObserver(syncMobileHeader);
+const nameEl = document.getElementById('sidebarUserName');
+if (nameEl) observer.observe(nameEl, { childList: true, characterData: true, subtree: true });
+syncMobileHeader();
+
+// Show/hide bottom nav and mobile header on login screen
+const bodyObserver = new MutationObserver(() => {
+  const isLogin = document.body.classList.contains('login-screen');
+  const bottomNav = document.getElementById('bottomNav');
+  const mobileHeader = document.getElementById('mobileHeader');
+  if (bottomNav) bottomNav.style.display = isLogin ? 'none' : '';
+  if (mobileHeader) mobileHeader.style.display = isLogin ? 'none' : '';
+});
+bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+</script>
 </body>
 </html>
