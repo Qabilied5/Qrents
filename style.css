@@ -128,6 +128,7 @@ html, body {
 }
 
 .sidebar-user {
+  margin-bottom: 10px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -724,7 +725,8 @@ form { padding: 20px 24px; }
 .modal-actions {
   display: flex;
   gap: 10px;
-  justify-content: flex-end;
+  /* justify-content: flex-end; */
+  justify-content: center;
   padding-top: 8px;
 }
 
