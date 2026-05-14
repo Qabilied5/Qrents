@@ -2,8 +2,41 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Qrents Pro — Manajemen Properti</title>
+
+<!-- ===== PWA META TAGS ===== -->
+<meta name="description" content="Aplikasi manajemen properti dan sewa rumah profesional">
+<meta name="theme-color" content="#c9a84c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Qrents">
+<meta name="msapplication-TileColor" content="#0f0f13">
+<meta name="msapplication-TileImage" content="icons/icon-144.png">
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<!-- Favicon & Icons -->
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-96.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/icon-72.png">
+<link rel="shortcut icon" href="icons/icon-192.png">
+
+<!-- Apple Touch Icons -->
+<link rel="apple-touch-icon" href="icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png">
+
+<!-- Apple Splash Screens (opsional) -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+<!-- Open Graph (opsional untuk share) -->
+<meta property="og:title" content="Qrents Pro">
+<meta property="og:description" content="Manajemen properti dan sewa rumah">
+<meta property="og:type" content="website">
+<!-- ===== END PWA META TAGS ===== -->
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -697,5 +730,111 @@ const bodyObserver = new MutationObserver(() => {
 });
 bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 </script>
+
+<!-- ===== PWA: SERVICE WORKER & INSTALL PROMPT ===== -->
+<script>
+// --- Service Worker Registration ---
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .then(reg => {
+        console.log('[PWA] Service Worker terdaftar, scope:', reg.scope);
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateBanner();
+            }
+          });
+        });
+      })
+      .catch(err => console.warn('[PWA] Gagal mendaftarkan Service Worker:', err));
+  });
+}
+
+function showUpdateBanner() {
+  const banner = document.createElement('div');
+  banner.id = 'pwa-update-banner';
+  banner.innerHTML = `
+    <span>🔄 Versi baru tersedia!</span>
+    <button onclick="location.reload(true)" style="background:#c9a84c;color:#000;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;margin-left:12px">Perbarui</button>
+    <button onclick="this.parentElement.remove()" style="background:transparent;color:#fff;border:1px solid #555;padding:6px 12px;border-radius:6px;cursor:pointer;margin-left:6px">Nanti</button>
+  `;
+  Object.assign(banner.style, {
+    position:'fixed',bottom:'80px',left:'50%',transform:'translateX(-50%)',
+    background:'#1e1e2a',color:'#fff',padding:'12px 20px',borderRadius:'12px',
+    boxShadow:'0 4px 20px rgba(0,0,0,0.5)',zIndex:'9999',display:'flex',
+    alignItems:'center',fontSize:'14px',border:'1px solid #c9a84c44',whiteSpace:'nowrap'
+  });
+  document.body.appendChild(banner);
+}
+
+// --- PWA Install Prompt ---
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (!window.matchMedia('(display-mode: standalone)').matches) showInstallButton();
+});
+
+function showInstallButton() {
+  const btn = document.createElement('button');
+  btn.id = 'pwa-install-btn';
+  btn.innerHTML = '📲 Pasang Aplikasi';
+  Object.assign(btn.style, {
+    position:'fixed',bottom:'80px',right:'16px',zIndex:'9998',
+    background:'#c9a84c',color:'#000',border:'none',padding:'10px 16px',
+    borderRadius:'24px',fontWeight:'700',fontSize:'13px',cursor:'pointer',
+    boxShadow:'0 4px 16px rgba(201,168,76,0.4)'
+  });
+  btn.onclick = triggerInstall;
+  document.body.appendChild(btn);
+  setTimeout(() => { if (btn.parentElement) btn.remove(); }, 10000);
+}
+
+async function triggerInstall() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.remove();
+}
+
+window.addEventListener('appinstalled', () => {
+  showToast('Qrents Pro berhasil dipasang di perangkat Anda! 🎉', 'success');
+  deferredInstallPrompt = null;
+});
+
+// --- Online/Offline Status ---
+function updateOnlineStatus() {
+  const isOnline = navigator.onLine;
+  const existing = document.getElementById('pwa-offline-bar');
+  if (!isOnline) {
+    if (existing) return;
+    const bar = document.createElement('div');
+    bar.id = 'pwa-offline-bar';
+    bar.textContent = '⚠️ Anda sedang offline — data mungkin tidak diperbarui';
+    Object.assign(bar.style, {
+      position:'fixed',top:'0',left:'0',right:'0',zIndex:'99999',
+      background:'#b34a4a',color:'#fff',textAlign:'center',
+      padding:'8px',fontSize:'13px',fontWeight:'500'
+    });
+    document.body.prepend(bar);
+  } else {
+    if (existing) {
+      existing.textContent = '✅ Koneksi pulih';
+      setTimeout(() => existing.remove(), 2000);
+    }
+  }
+}
+
+window.addEventListener('online',  updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+updateOnlineStatus();
+</script>
+<!-- ===== END PWA ===== -->
+
 </body>
 </html>
