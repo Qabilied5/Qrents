@@ -24,12 +24,8 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK' });
 });
 
-// 4. Melayani File Statis (Frontend)
-// Pastikan folder frontend Anda berada satu level di atas folder backend
 app.use(express.static(path.join(__dirname, '../'))); 
 
-// 5. Wildcard Route (Harus paling bawah)
-// Ini akan mengirimkan index.html jika tidak ada rute API yang cocok
 app.get('*', (req, res) => {
   res.sendFile(path.resolve(__dirname, '..', 'index.html'));
 });
