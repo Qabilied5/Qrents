@@ -557,7 +557,10 @@
         </div>
         <div class="form-group">
           <label>Jumlah (Rp) *</label>
-          <input type="number" id="incomeAmount" required placeholder="3500000">
+          <!-- Field tampilan (type=tel → keyboard angka di semua HP) -->
+          <input type="tel" id="incomeAmountDisplay" placeholder="3.500.000" autocomplete="off">
+          <!-- Field nilai asli (hidden, dikirim ke API) -->
+          <input type="hidden" id="incomeAmount" required>
         </div>
       </div>
       <div class="form-row">
@@ -927,3 +930,72 @@ document.addEventListener('keydown', function(e) {
 
 </body>
 </html>
+<!-- ===== FORMAT RUPIAH: incomeAmount ===== -->
+<script>
+(function () {
+  function formatRupiah(digits) {
+    if (!digits) return '';
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  function initRupiahField() {
+    const display = document.getElementById('incomeAmountDisplay');
+    const hidden  = document.getElementById('incomeAmount');
+    if (!display || !hidden) return;
+
+    // Sinkron nilai: display → hidden (raw)
+    function sync() {
+      const raw = display.value.replace(/\D/g, '');
+      hidden.value = raw;         // angka bersih untuk API
+      // Format tampilan
+      const pos = display.selectionStart;
+      const prevLen = display.value.length;
+      display.value = formatRupiah(raw);
+      const diff = display.value.length - prevLen;
+      display.setSelectionRange(pos + diff, pos + diff);
+    }
+
+    display.addEventListener('input', sync);
+
+    // Blokir karakter non-digit (antisipasi paste huruf, dsb)
+    display.addEventListener('keydown', function (e) {
+      const ctrl = e.ctrlKey || e.metaKey;
+      const nav  = [8,9,35,36,37,38,39,40,46].includes(e.keyCode);
+      if (ctrl || nav) return;
+      if (e.key < '0' || e.key > '9') e.preventDefault();
+    });
+
+    // Intercept set value dari app-api.js (mode edit: incomeAmount.value = 3000000)
+    const hiddenProto = Object.getPrototypeOf(hidden);
+    const hiddenDesc  = Object.getOwnPropertyDescriptor(hiddenProto, 'value');
+    if (hiddenDesc) {
+      Object.defineProperty(hidden, 'value', {
+        get: hiddenDesc.get,
+        set: function (val) {
+          hiddenDesc.set.call(this, val);
+          // Tampilkan ke display jika val adalah angka murni
+          if (/^\d+$/.test(String(val).trim())) {
+            display.value = formatRupiah(String(val));
+          }
+        },
+        configurable: true,
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRupiahField);
+  } else {
+    initRupiahField();
+  }
+
+  // Helper global jika diperlukan dari luar
+  window.setIncomeAmountFormatted = function (num) {
+    const hidden  = document.getElementById('incomeAmount');
+    const display = document.getElementById('incomeAmountDisplay');
+    if (hidden)  hidden.value  = String(num);
+    if (display) display.value = formatRupiah(String(num));
+  };
+})();
+</script>
+<!-- ===== END FORMAT RUPIAH ===== -->
