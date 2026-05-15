@@ -1,3 +1,15 @@
+/* ===== PREVENT ZOOM ON MOBILE ===== */
+html {
+  touch-action: pan-x pan-y;
+  -ms-touch-action: pan-x pan-y;
+}
+
+/* Input font-size >= 16px prevents auto-zoom on iOS Safari when focusing inputs */
+input, select, textarea {
+  font-size: max(16px, 1em) !important;
+}
+/* ===== END PREVENT ZOOM ===== */
+
 /* ===== ROOT & RESET ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
