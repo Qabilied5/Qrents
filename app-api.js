@@ -38,8 +38,16 @@ function navigateTo(pageId) {
   if (pageId === 'tenants') renderTenants();
   if (pageId === 'income') { populateIncomeFilters(); renderIncome(); }
   if (pageId === 'expenses') { populateExpenseFilters(); renderExpenses(); }
-  if (pageId === 'internal-incomes') { populateInternalFilters('intInc'); renderInternalIncomes(); }
-  if (pageId === 'internal-expenses') { populateInternalFilters('intExp'); renderInternalExpenses(); }
+  if (pageId === 'internal-incomes') {
+    populateInternalFilters('intInc');
+    populateIntCategoryFilter('filterIntIncCategory', STORAGE_KEY_INC, DEFAULT_INC_CATS);
+    renderInternalIncomes();
+  }
+  if (pageId === 'internal-expenses') {
+    populateInternalFilters('intExp');
+    populateIntCategoryFilter('filterIntExpCategory', STORAGE_KEY_EXP, DEFAULT_EXP_CATS);
+    renderInternalExpenses();
+  }
   if (pageId === 'reports') renderReports();
 
   // Close sidebar on mobile
@@ -931,8 +939,9 @@ async function exportReport() {
 // ========== INTERNAL INCOMES ==========
 function populateInternalFilters(prefix) {
   const now = new Date();
-  const monthSel = document.getElementById(`filter${prefix.charAt(0).toUpperCase()+prefix.slice(1)}Month`);
-  const yearSel  = document.getElementById(`filter${prefix.charAt(0).toUpperCase()+prefix.slice(1)}Year`);
+  const capPrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+  const monthSel = document.getElementById(`filter${capPrefix}Month`);
+  const yearSel  = document.getElementById(`filter${capPrefix}Year`);
   if (!monthSel || !yearSel) return;
 
   if (monthSel.options.length <= 1) {
@@ -948,14 +957,34 @@ function populateInternalFilters(prefix) {
   }
 }
 
+function populateIntCategoryFilter(selectId, storageKey, defaults) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const currentVal = sel.value;
+  const cats = getIntCategories(storageKey, defaults);
+  sel.innerHTML = '<option value="">Semua Jenis</option>';
+  cats.forEach(c => {
+    sel.innerHTML += `<option value="${c}">${c}</option>`;
+  });
+  // Pertahankan pilihan sebelumnya jika masih ada
+  if (currentVal && [...sel.options].some(o => o.value === currentVal)) {
+    sel.value = currentVal;
+  }
+}
+
 async function renderInternalIncomes() {
   try {
     let data = await API.get('/internal-incomes');
-    const fMonth = document.getElementById('filterIntIncMonth')?.value;
-    const fYear  = document.getElementById('filterIntIncYear')?.value;
+    const fMonth    = document.getElementById('filterIntIncMonth')?.value;
+    const fYear     = document.getElementById('filterIntIncYear')?.value;
+    const fCategory = document.getElementById('filterIntIncCategory')?.value;
 
     if (fMonth !== '' && fMonth !== undefined) data = data.filter(i => new Date(i.date).getMonth() == fMonth);
     if (fYear) data = data.filter(i => new Date(i.date).getFullYear() == fYear);
+    if (fCategory) data = data.filter(i => i.category === fCategory);
+
+    // Refresh opsi filter category dari data yang tersedia + localStorage
+    populateIntCategoryFilter('filterIntIncCategory', STORAGE_KEY_INC, DEFAULT_INC_CATS);
 
     data.sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -1137,6 +1166,8 @@ function addIntIncCategory() {
   document.getElementById('intIncCategory').value = name;
   document.getElementById('intIncNewCategoryWrap').style.display = 'none';
   if (input) input.value = '';
+  // Refresh filter category di halaman
+  populateIntCategoryFilter('filterIntIncCategory', STORAGE_KEY_INC, DEFAULT_INC_CATS);
   showToast(`Jenis "${name}" ditambahkan ✓`);
 }
 
@@ -1173,11 +1204,16 @@ function addIntExpCategory() {
 async function renderInternalExpenses() {
   try {
     let data = await API.get('/internal-expenses');
-    const fMonth = document.getElementById('filterIntExpMonth')?.value;
-    const fYear  = document.getElementById('filterIntExpYear')?.value;
+    const fMonth    = document.getElementById('filterIntExpMonth')?.value;
+    const fYear     = document.getElementById('filterIntExpYear')?.value;
+    const fCategory = document.getElementById('filterIntExpCategory')?.value;
 
     if (fMonth !== '' && fMonth !== undefined) data = data.filter(i => new Date(i.date).getMonth() == fMonth);
     if (fYear) data = data.filter(i => new Date(i.date).getFullYear() == fYear);
+    if (fCategory) data = data.filter(i => i.category === fCategory);
+
+    // Refresh opsi filter category dari data yang tersedia + localStorage
+    populateIntCategoryFilter('filterIntExpCategory', STORAGE_KEY_EXP, DEFAULT_EXP_CATS);
 
     data.sort((a, b) => new Date(b.date) - new Date(a.date));
 
