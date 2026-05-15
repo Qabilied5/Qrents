@@ -1104,8 +1104,8 @@ async function deleteInternalIncome(id) {
 const STORAGE_KEY_INC = 'qrents_intInc_categories';
 const STORAGE_KEY_EXP = 'qrents_intExp_categories';
 
-const DEFAULT_INC_CATS = ['Hutang Dibayar', 'Pinjaman Diterima', 'Hasil Usaha Lain', 'Transfer Masuk'];
-const DEFAULT_EXP_CATS = ['Kebutuhan Rumah Tangga', 'Makan & Minum', 'Transportasi', 'Kesehatan', 'Pendidikan', 'Tagihan & Utilitas', 'Hiburan', 'Lainnya'];
+const DEFAULT_INC_CATS = [];
+const DEFAULT_EXP_CATS = [];
 
 function getIntCategories(key, defaults) {
   try {
@@ -1126,7 +1126,7 @@ function populateIntCategorySelect(selectId, wrapId, key, defaults) {
   if (!sel) return;
 
   const cats = getIntCategories(key, defaults);
-  sel.innerHTML = '<option value="">— Pilih Jenis —</option>';
+  sel.innerHTML = '<option value="">Pilih Jenis</option>';
   cats.forEach(c => {
     sel.innerHTML += `<option value="${c}">${c}</option>`;
   });
