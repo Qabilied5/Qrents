@@ -69,6 +69,12 @@
     <a href="#" class="nav-item" data-page="expenses">
       <span class="nav-icon">📋</span><span>Pengeluaran</span>
     </a>
+    <a href="#" class="nav-item" data-page="internal-incomes">
+      <span class="nav-icon">💰</span><span>Kas Masuk</span>
+    </a>
+    <a href="#" class="nav-item" data-page="internal-expenses">
+      <span class="nav-icon">🛒</span><span>Kas Keluar</span>
+    </a>
     <a href="#" class="nav-item" data-page="reports">
       <span class="nav-icon">📊</span><span>Laporan</span>
     </a>
@@ -355,6 +361,74 @@
       </div>
       <div class="table-footer">
         <span>Total: </span><strong id="expenseTotalDisplay">Rp 0</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== INTERNAL INCOMES PAGE ===== -->
+  <section class="page" id="page-internal-incomes">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Kas Masuk</h1>
+        <p class="page-subtitle">Pemasukan di luar hasil sewa (hutang dibayar, dll)</p>
+      </div>
+      <button class="btn btn-primary" onclick="openAddInternalIncome()">+ Catat Kas Masuk</button>
+    </div>
+
+    <div class="filter-bar">
+      <select id="filterIntIncMonth" onchange="renderInternalIncomes()">
+        <option value="">Semua Bulan</option>
+      </select>
+      <select id="filterIntIncYear" onchange="renderInternalIncomes()">
+        <option value="">Semua Tahun</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Tanggal</th><th>Nama</th><th>Jumlah</th><th>Catatan</th><th>Aksi</th></tr>
+          </thead>
+          <tbody id="internalIncomeTable"></tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <span>Total: </span><strong id="internalIncomeTotalDisplay">Rp 0</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== INTERNAL EXPENSES PAGE ===== -->
+  <section class="page" id="page-internal-expenses">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Kas Keluar</h1>
+        <p class="page-subtitle">Pengeluaran di luar biaya properti (beli kebutuhan, dll)</p>
+      </div>
+      <button class="btn btn-primary" onclick="openAddInternalExpense()">+ Catat Kas Keluar</button>
+    </div>
+
+    <div class="filter-bar">
+      <select id="filterIntExpMonth" onchange="renderInternalExpenses()">
+        <option value="">Semua Bulan</option>
+      </select>
+      <select id="filterIntExpYear" onchange="renderInternalExpenses()">
+        <option value="">Semua Tahun</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Tanggal</th><th>Nama</th><th>Jumlah</th><th>Catatan</th><th>Aksi</th></tr>
+          </thead>
+          <tbody id="internalExpenseTable"></tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <span>Total: </span><strong id="internalExpenseTotalDisplay">Rp 0</strong>
       </div>
     </div>
   </section>
@@ -660,6 +734,76 @@
   </div>
 </div>
 
+<!-- Modal Kas Masuk (Internal Income) -->
+<div class="modal-overlay" id="modalInternalIncome">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalInternalIncomeTitle">Catat Kas Masuk</h2>
+      <button class="modal-close" onclick="closeModal('modalInternalIncome')">✕</button>
+    </div>
+    <form id="formInternalIncome" onsubmit="saveInternalIncome(event)">
+      <input type="hidden" id="internalIncomeId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tanggal *</label>
+          <input type="date" id="intIncDate" required>
+        </div>
+        <div class="form-group">
+          <label>Jumlah (Rp) *</label>
+          <input type="number" id="intIncAmount" required placeholder="500000">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Nama Pemasukan *</label>
+        <input type="text" id="intIncName" required placeholder="cth: Pembayaran hutang Budi">
+      </div>
+      <div class="form-group">
+        <label>Catatan</label>
+        <textarea id="intIncNote" placeholder="Keterangan tambahan..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modalInternalIncome')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Kas Keluar (Internal Expense) -->
+<div class="modal-overlay" id="modalInternalExpense">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalInternalExpenseTitle">Catat Kas Keluar</h2>
+      <button class="modal-close" onclick="closeModal('modalInternalExpense')">✕</button>
+    </div>
+    <form id="formInternalExpense" onsubmit="saveInternalExpense(event)">
+      <input type="hidden" id="internalExpenseId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tanggal *</label>
+          <input type="date" id="intExpDate" required>
+        </div>
+        <div class="form-group">
+          <label>Jumlah (Rp) *</label>
+          <input type="number" id="intExpAmount" required placeholder="100000">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Nama Pengeluaran *</label>
+        <input type="text" id="intExpName" required placeholder="cth: Beli beras 5kg">
+      </div>
+      <div class="form-group">
+        <label>Catatan</label>
+        <textarea id="intExpNote" placeholder="Keterangan tambahan..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modalInternalExpense')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -703,6 +847,20 @@
     <div>
       <div class="fab-menu-label">Pengeluaran</div>
       <div class="fab-menu-sub">Catat biaya operasional</div>
+    </div>
+  </button>
+  <button class="fab-menu-item" onclick="hideFabMenu(); navigateTo('internal-incomes'); setTimeout(() => openAddInternalIncome(), 200)">
+    <span class="fab-menu-icon accent-green-icon">💰</span>
+    <div>
+      <div class="fab-menu-label">Kas Masuk</div>
+      <div class="fab-menu-sub">Pemasukan non-sewa</div>
+    </div>
+  </button>
+  <button class="fab-menu-item" onclick="hideFabMenu(); navigateTo('internal-expenses'); setTimeout(() => openAddInternalExpense(), 200)">
+    <span class="fab-menu-icon accent-red-icon">🛒</span>
+    <div>
+      <div class="fab-menu-label">Kas Keluar</div>
+      <div class="fab-menu-sub">Pengeluaran non-properti</div>
     </div>
   </button>
   <button class="fab-menu-item" onclick="hideFabMenu(); navigateTo('properties'); setTimeout(() => openModal('modalProperty'), 200)">

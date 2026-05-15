@@ -38,6 +38,8 @@ function navigateTo(pageId) {
   if (pageId === 'tenants') renderTenants();
   if (pageId === 'income') { populateIncomeFilters(); renderIncome(); }
   if (pageId === 'expenses') { populateExpenseFilters(); renderExpenses(); }
+  if (pageId === 'internal-incomes') { populateInternalFilters('intInc'); renderInternalIncomes(); }
+  if (pageId === 'internal-expenses') { populateInternalFilters('intExp'); renderInternalExpenses(); }
   if (pageId === 'reports') renderReports();
 
   // Close sidebar on mobile
@@ -921,6 +923,215 @@ async function exportReport() {
     a.download = `laporan_${year}.csv`;
     a.click();
     showToast('Laporan CSV berhasil diunduh ✓');
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+// ========== INTERNAL INCOMES ==========
+function populateInternalFilters(prefix) {
+  const now = new Date();
+  const monthSel = document.getElementById(`filter${prefix.charAt(0).toUpperCase()+prefix.slice(1)}Month`);
+  const yearSel  = document.getElementById(`filter${prefix.charAt(0).toUpperCase()+prefix.slice(1)}Year`);
+  if (!monthSel || !yearSel) return;
+
+  if (monthSel.options.length <= 1) {
+    fullMonth.forEach((m, i) => {
+      monthSel.innerHTML += `<option value="${i}">${m}</option>`;
+    });
+  }
+  if (yearSel.options.length <= 1) {
+    yearSel.innerHTML = '<option value="">Semua Tahun</option>';
+    for (let y = now.getFullYear(); y >= now.getFullYear() - 4; y--) {
+      yearSel.innerHTML += `<option value="${y}">${y}</option>`;
+    }
+  }
+}
+
+async function renderInternalIncomes() {
+  try {
+    let data = await API.get('/internal-incomes');
+    const fMonth = document.getElementById('filterIntIncMonth')?.value;
+    const fYear  = document.getElementById('filterIntIncYear')?.value;
+
+    if (fMonth !== '' && fMonth !== undefined) data = data.filter(i => new Date(i.date).getMonth() == fMonth);
+    if (fYear) data = data.filter(i => new Date(i.date).getFullYear() == fYear);
+
+    data.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const tbody = document.getElementById('internalIncomeTable');
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">💰</div><div class="empty-state-title">Belum ada data kas masuk</div></div></td></tr>`;
+    } else {
+      tbody.innerHTML = data.map(i => `
+        <tr>
+          <td>${fmtDate(i.date)}</td>
+          <td>${i.name}</td>
+          <td class="amount-positive">+${fmt(i.amount)}</td>
+          <td>${i.note || '—'}</td>
+          <td>
+            <button class="btn btn-outline btn-sm" onclick="editInternalIncome('${i._id}')">✏</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteInternalIncome('${i._id}')">🗑</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+    const total = data.reduce((s, i) => s + i.amount, 0);
+    document.getElementById('internalIncomeTotalDisplay').textContent = fmt(total);
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+function openAddInternalIncome() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('internalIncomeId').value = '';
+  document.getElementById('formInternalIncome').reset();
+  document.getElementById('intIncDate').value = today;
+  document.getElementById('modalInternalIncomeTitle').textContent = 'Catat Kas Masuk';
+  openModal('modalInternalIncome');
+}
+
+async function editInternalIncome(id) {
+  try {
+    const item = await API.get(`/internal-incomes/${id}`);
+    document.getElementById('internalIncomeId').value = item._id;
+    document.getElementById('intIncDate').value = item.date.split('T')[0];
+    document.getElementById('intIncName').value = item.name;
+    document.getElementById('intIncAmount').value = item.amount;
+    document.getElementById('intIncNote').value = item.note || '';
+    document.getElementById('modalInternalIncomeTitle').textContent = 'Edit Kas Masuk';
+    openModal('modalInternalIncome');
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function saveInternalIncome(e) {
+  e.preventDefault();
+  try {
+    const id = document.getElementById('internalIncomeId').value;
+    const data = {
+      date:   document.getElementById('intIncDate').value,
+      name:   document.getElementById('intIncName').value.trim(),
+      amount: parseFloat(document.getElementById('intIncAmount').value),
+      note:   document.getElementById('intIncNote').value.trim(),
+    };
+    if (id) {
+      await API.put(`/internal-incomes/${id}`, data);
+      showToast('Kas masuk diperbarui ✓');
+    } else {
+      await API.post('/internal-incomes', data);
+      showToast('Kas masuk berhasil dicatat ✓');
+    }
+    closeModal('modalInternalIncome');
+    renderInternalIncomes();
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function deleteInternalIncome(id) {
+  if (!confirm('Hapus data kas masuk ini?')) return;
+  try {
+    await API.delete(`/internal-incomes/${id}`);
+    renderInternalIncomes();
+    showToast('Data dihapus', 'error');
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+// ========== INTERNAL EXPENSES ==========
+async function renderInternalExpenses() {
+  try {
+    let data = await API.get('/internal-expenses');
+    const fMonth = document.getElementById('filterIntExpMonth')?.value;
+    const fYear  = document.getElementById('filterIntExpYear')?.value;
+
+    if (fMonth !== '' && fMonth !== undefined) data = data.filter(i => new Date(i.date).getMonth() == fMonth);
+    if (fYear) data = data.filter(i => new Date(i.date).getFullYear() == fYear);
+
+    data.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const tbody = document.getElementById('internalExpenseTable');
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">🛒</div><div class="empty-state-title">Belum ada data kas keluar</div></div></td></tr>`;
+    } else {
+      tbody.innerHTML = data.map(i => `
+        <tr>
+          <td>${fmtDate(i.date)}</td>
+          <td>${i.name}</td>
+          <td class="amount-negative">-${fmt(i.amount)}</td>
+          <td>${i.note || '—'}</td>
+          <td>
+            <button class="btn btn-outline btn-sm" onclick="editInternalExpense('${i._id}')">✏</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteInternalExpense('${i._id}')">🗑</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+    const total = data.reduce((s, i) => s + i.amount, 0);
+    document.getElementById('internalExpenseTotalDisplay').textContent = fmt(total);
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+function openAddInternalExpense() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('internalExpenseId').value = '';
+  document.getElementById('formInternalExpense').reset();
+  document.getElementById('intExpDate').value = today;
+  document.getElementById('modalInternalExpenseTitle').textContent = 'Catat Kas Keluar';
+  openModal('modalInternalExpense');
+}
+
+async function editInternalExpense(id) {
+  try {
+    const item = await API.get(`/internal-expenses/${id}`);
+    document.getElementById('internalExpenseId').value = item._id;
+    document.getElementById('intExpDate').value = item.date.split('T')[0];
+    document.getElementById('intExpName').value = item.name;
+    document.getElementById('intExpAmount').value = item.amount;
+    document.getElementById('intExpNote').value = item.note || '';
+    document.getElementById('modalInternalExpenseTitle').textContent = 'Edit Kas Keluar';
+    openModal('modalInternalExpense');
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function saveInternalExpense(e) {
+  e.preventDefault();
+  try {
+    const id = document.getElementById('internalExpenseId').value;
+    const data = {
+      date:   document.getElementById('intExpDate').value,
+      name:   document.getElementById('intExpName').value.trim(),
+      amount: parseFloat(document.getElementById('intExpAmount').value),
+      note:   document.getElementById('intExpNote').value.trim(),
+    };
+    if (id) {
+      await API.put(`/internal-expenses/${id}`, data);
+      showToast('Kas keluar diperbarui ✓');
+    } else {
+      await API.post('/internal-expenses', data);
+      showToast('Kas keluar berhasil dicatat ✓');
+    }
+    closeModal('modalInternalExpense');
+    renderInternalExpenses();
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function deleteInternalExpense(id) {
+  if (!confirm('Hapus data kas keluar ini?')) return;
+  try {
+    await API.delete(`/internal-expenses/${id}`);
+    renderInternalExpenses();
+    showToast('Data dihapus', 'error');
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
   }
