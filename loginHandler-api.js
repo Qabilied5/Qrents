@@ -2,8 +2,8 @@
 const API_URL = '/api';
 
 // ===== CAPTCHA & RATE LIMIT CONFIG =====
-const REG_COOLDOWN_MS = 5 * 60 * 1000; // 5 menit cooldown antar registrasi
-const REG_MAX_ATTEMPTS = 3;             // maks 3 akun per 24 jam per browser
+const REG_COOLDOWN_MS = 180 * 60 * 1000; // 60 menit
+const REG_MAX_ATTEMPTS = 3;
 let _captchaAnswer = null;
 
 function generateCaptcha() {
