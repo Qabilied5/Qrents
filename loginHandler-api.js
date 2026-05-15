@@ -1,5 +1,104 @@
 // const API_URL = 'http://localhost:5000/api';
 const API_URL = '/api';
+
+// ===== CAPTCHA & RATE LIMIT CONFIG =====
+const REG_COOLDOWN_MS = 5 * 60 * 1000; // 5 menit cooldown antar registrasi
+const REG_MAX_ATTEMPTS = 3;             // maks 3 akun per 24 jam per browser
+let _captchaAnswer = null;
+
+function generateCaptcha() {
+  const ops = ['+', '-', '×'];
+  const op = ops[Math.floor(Math.random() * ops.length)];
+  let a, b, answer;
+  if (op === '+') {
+    a = Math.floor(Math.random() * 20) + 1;
+    b = Math.floor(Math.random() * 20) + 1;
+    answer = a + b;
+  } else if (op === '-') {
+    a = Math.floor(Math.random() * 20) + 10;
+    b = Math.floor(Math.random() * 10) + 1;
+    answer = a - b;
+  } else {
+    a = Math.floor(Math.random() * 9) + 2;
+    b = Math.floor(Math.random() * 9) + 2;
+    answer = a * b;
+  }
+  _captchaAnswer = answer;
+  const captchaText = document.getElementById('captchaText');
+  const captchaInput = document.getElementById('captchaAnswer');
+  const captchaError = document.getElementById('captchaError');
+  if (captchaText) captchaText.textContent = `${a} ${op} ${b} = ?`;
+  if (captchaInput) captchaInput.value = '';
+  if (captchaError) captchaError.style.display = 'none';
+}
+
+function checkRegCooldown() {
+  const lastReg = parseInt(localStorage.getItem('lastRegTime') || '0');
+  const remaining = REG_COOLDOWN_MS - (Date.now() - lastReg);
+  if (remaining > 0) return remaining; // masih cooldown, return ms tersisa
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const regData = JSON.parse(localStorage.getItem('regAttempts') || '{"count":0,"since":0}');
+  if (Date.now() - regData.since > dayMs) {
+    localStorage.setItem('regAttempts', JSON.stringify({ count: 0, since: Date.now() }));
+    return 0;
+  }
+  if (regData.count >= REG_MAX_ATTEMPTS) return -1; // blokir hari ini
+  return 0;
+}
+
+function recordRegAttempt() {
+  localStorage.setItem('lastRegTime', Date.now().toString());
+  const dayMs = 24 * 60 * 60 * 1000;
+  const regData = JSON.parse(localStorage.getItem('regAttempts') || '{"count":0,"since":0}');
+  if (Date.now() - regData.since > dayMs) {
+    localStorage.setItem('regAttempts', JSON.stringify({ count: 1, since: Date.now() }));
+  } else {
+    regData.count++;
+    localStorage.setItem('regAttempts', JSON.stringify(regData));
+  }
+}
+
+function updateCooldownUI() {
+  const notice = document.getElementById('regCooldownNotice');
+  const submitBtn = document.getElementById('regSubmitBtn');
+  if (!notice || !submitBtn) return;
+
+  const status = checkRegCooldown();
+  if (status === -1) {
+    notice.style.display = 'block';
+    notice.textContent = `⛔ Batas pembuatan akun hari ini tercapai (${REG_MAX_ATTEMPTS}x). Coba lagi besok.`;
+    submitBtn.disabled = true;
+    submitBtn.style.opacity = '0.5';
+    return;
+  }
+  if (status > 0) {
+    submitBtn.disabled = true;
+    submitBtn.style.opacity = '0.5';
+    const showCountdown = () => {
+      const sisa = checkRegCooldown();
+      if (sisa <= 0) {
+        notice.style.display = 'none';
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '';
+        generateCaptcha();
+        return;
+      }
+      const m = Math.floor(sisa / 60000);
+      const s = Math.floor((sisa % 60000) / 1000);
+      notice.style.display = 'block';
+      notice.textContent = `⏳ Tunggu ${m}m ${s}s sebelum membuat akun lagi`;
+      setTimeout(showCountdown, 1000);
+    };
+    showCountdown();
+    return;
+  }
+  notice.style.display = 'none';
+  submitBtn.disabled = false;
+  submitBtn.style.opacity = '';
+}
+// ===== END CAPTCHA & RATE LIMIT =====
+
 let authToken = localStorage.getItem('authToken');
 
 function getAuthHeader() {
@@ -28,6 +127,8 @@ function openLoginScreen() {
 function showRegisterForm() {
   document.getElementById('loginForm').classList.add('hidden');
   document.getElementById('registerForm').classList.remove('hidden');
+  generateCaptcha();
+  updateCooldownUI();
 }
 
 function showLoginForm() {
@@ -90,6 +191,30 @@ async function createAccount(event) {
     return;
   }
 
+  // --- Cek rate limit ---
+  const cooldownStatus = checkRegCooldown();
+  if (cooldownStatus === -1) {
+    showToast(`Batas pembuatan akun hari ini tercapai. Coba lagi besok.`, 'error');
+    return;
+  }
+  if (cooldownStatus > 0) {
+    const m = Math.floor(cooldownStatus / 60000);
+    const s = Math.floor((cooldownStatus % 60000) / 1000);
+    showToast(`Tunggu ${m}m ${s}s sebelum membuat akun lagi.`, 'error');
+    return;
+  }
+
+  // --- Validasi CAPTCHA ---
+  const userAnswer = parseInt(document.getElementById('captchaAnswer').value);
+  const captchaError = document.getElementById('captchaError');
+  if (isNaN(userAnswer) || userAnswer !== _captchaAnswer) {
+    if (captchaError) captchaError.style.display = 'block';
+    generateCaptcha(); // generate soal baru setelah gagal
+    showToast('Jawaban verifikasi salah.', 'error');
+    return;
+  }
+  if (captchaError) captchaError.style.display = 'none';
+
   try {
     const response = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
@@ -101,8 +226,12 @@ async function createAccount(event) {
 
     if (!response.ok) {
       showToast(data.message || 'Registrasi gagal', 'error');
+      generateCaptcha(); // refresh CAPTCHA jika server tolak
       return;
     }
+
+    // Catat attempt hanya jika server sukses
+    recordRegAttempt();
 
     showToast('Akun berhasil dibuat. Silakan login.');
     document.getElementById('registerForm').reset();
@@ -110,6 +239,7 @@ async function createAccount(event) {
     document.getElementById('loginUsername').value = username;
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
+    generateCaptcha();
   }
 }
 
