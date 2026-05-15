@@ -167,9 +167,13 @@ async function renderDashboard() {
     const now = new Date();
     document.getElementById('headerDate').innerHTML = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-    const incomes = await API.get('/income');
-    const expenses = await API.get('/expenses');
-    const props = await API.get('/properties');
+    const [incomes, expenses, intIncomes, intExpenses, props] = await Promise.all([
+      API.get('/income'),
+      API.get('/expenses'),
+      API.get('/internal-incomes'),
+      API.get('/internal-expenses'),
+      API.get('/properties'),
+    ]);
 
     const curMonth = now.getMonth();
     const curYear = now.getFullYear();
@@ -182,16 +186,30 @@ async function renderDashboard() {
       const d = new Date(i.date);
       return d.getMonth() === curMonth && d.getFullYear() === curYear;
     });
+    const monthIntIncome = intIncomes.filter(i => {
+      const d = new Date(i.date);
+      return d.getMonth() === curMonth && d.getFullYear() === curYear;
+    });
+    const monthIntExpense = intExpenses.filter(i => {
+      const d = new Date(i.date);
+      return d.getMonth() === curMonth && d.getFullYear() === curYear;
+    });
 
-    const totalIn = monthIncome.reduce((s, i) => s + i.amount, 0);
-    const totalOut = monthExpense.reduce((s, i) => s + i.amount, 0);
+    const totalIn  = monthIncome.reduce((s, i) => s + i.amount, 0)
+                   + monthIntIncome.reduce((s, i) => s + i.amount, 0);
+    const totalOut = monthExpense.reduce((s, i) => s + i.amount, 0)
+                   + monthIntExpense.reduce((s, i) => s + i.amount, 0);
     const profit = totalIn - totalOut;
+
+    // Hitung jumlah transaksi gabungan untuk subtitle
+    const totalInCount  = monthIncome.length + monthIntIncome.length;
+    const totalOutCount = monthExpense.length + monthIntExpense.length;
     const occupied = props.filter(p => p.status === 'terisi').length;
 
     document.getElementById('stat-income').textContent = fmt(totalIn);
-    document.getElementById('stat-income-sub').textContent = `${monthIncome.length} transaksi`;
+    document.getElementById('stat-income-sub').textContent = `${totalInCount} transaksi`;
     document.getElementById('stat-expense').textContent = fmt(totalOut);
-    document.getElementById('stat-expense-sub').textContent = `${monthExpense.length} transaksi`;
+    document.getElementById('stat-expense-sub').textContent = `${totalOutCount} transaksi`;
     document.getElementById('stat-profit').textContent = (profit >= 0 ? '' : '-') + fmt(profit);
     document.getElementById('stat-profit').style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
     document.getElementById('stat-properties').textContent = props.length;
@@ -221,8 +239,16 @@ async function renderDashboard() {
       const mIn = incomes.filter(t => {
         const td = new Date(t.date);
         return td.getMonth() === d.getMonth() && td.getFullYear() === d.getFullYear();
+      }).reduce((s, t) => s + t.amount, 0)
+      + intIncomes.filter(t => {
+        const td = new Date(t.date);
+        return td.getMonth() === d.getMonth() && td.getFullYear() === d.getFullYear();
       }).reduce((s, t) => s + t.amount, 0);
       const mOut = expenses.filter(t => {
+        const td = new Date(t.date);
+        return td.getMonth() === d.getMonth() && td.getFullYear() === d.getFullYear();
+      }).reduce((s, t) => s + t.amount, 0)
+      + intExpenses.filter(t => {
         const td = new Date(t.date);
         return td.getMonth() === d.getMonth() && td.getFullYear() === d.getFullYear();
       }).reduce((s, t) => s + t.amount, 0);
@@ -835,12 +861,22 @@ async function renderReports() {
     }
 
     const year = parseInt(document.getElementById('reportYear').value) || now.getFullYear();
-    const incomes = (await API.get('/income')).filter(i => new Date(i.date).getFullYear() === year);
-    const expenses = (await API.get('/expenses')).filter(i => new Date(i.date).getFullYear() === year);
-    const props = await API.get('/properties');
+    const [allIncome, allExpenses, allIntIncomes, allIntExpenses, props] = await Promise.all([
+      API.get('/income'),
+      API.get('/expenses'),
+      API.get('/internal-incomes'),
+      API.get('/internal-expenses'),
+      API.get('/properties'),
+    ]);
+    const incomes  = allIncome.filter(i => new Date(i.date).getFullYear() === year);
+    const expenses = allExpenses.filter(i => new Date(i.date).getFullYear() === year);
+    const intIncomes  = allIntIncomes.filter(i => new Date(i.date).getFullYear() === year);
+    const intExpenses = allIntExpenses.filter(i => new Date(i.date).getFullYear() === year);
 
-    const totalIn = incomes.reduce((s, i) => s + i.amount, 0);
-    const totalOut = expenses.reduce((s, i) => s + i.amount, 0);
+    const totalIn  = incomes.reduce((s, i) => s + i.amount, 0)
+                   + intIncomes.reduce((s, i) => s + i.amount, 0);
+    const totalOut = expenses.reduce((s, i) => s + i.amount, 0)
+                   + intExpenses.reduce((s, i) => s + i.amount, 0);
     const occupied = props.filter(p => p.status === 'terisi').length;
 
     document.getElementById('rep-income').textContent = fmt(totalIn);
@@ -854,6 +890,8 @@ async function renderReports() {
     const dataOut = Array(12).fill(0);
     incomes.forEach(i => { dataIn[new Date(i.date).getMonth()] += i.amount; });
     expenses.forEach(i => { dataOut[new Date(i.date).getMonth()] += i.amount; });
+    intIncomes.forEach(i => { dataIn[new Date(i.date).getMonth()] += i.amount; });
+    intExpenses.forEach(i => { dataOut[new Date(i.date).getMonth()] += i.amount; });
 
     if (reportChartInstance) reportChartInstance.destroy();
     const ctx = document.getElementById('reportChart').getContext('2d');
@@ -1082,6 +1120,7 @@ async function saveInternalIncome(e) {
     }
     closeModal('modalInternalIncome');
     renderInternalIncomes();
+    renderDashboard();
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
   }
@@ -1092,6 +1131,7 @@ async function deleteInternalIncome(id) {
   try {
     await API.delete(`/internal-incomes/${id}`);
     renderInternalIncomes();
+    renderDashboard();
     showToast('Data dihapus', 'error');
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
@@ -1308,6 +1348,7 @@ async function saveInternalExpense(e) {
     }
     closeModal('modalInternalExpense');
     renderInternalExpenses();
+    renderDashboard();
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
   }
@@ -1318,6 +1359,7 @@ async function deleteInternalExpense(id) {
   try {
     await API.delete(`/internal-expenses/${id}`);
     renderInternalExpenses();
+    renderDashboard();
     showToast('Data dihapus', 'error');
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
