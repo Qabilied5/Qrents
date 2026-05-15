@@ -49,6 +49,7 @@ function navigateTo(pageId) {
     renderInternalExpenses();
   }
   if (pageId === 'reports') renderReports();
+  if (pageId === 'cicilan') { populateCicilanFilters(); renderCicilan(); }
 
   // Close sidebar on mobile
   if (window.innerWidth <= 768) {
@@ -1549,6 +1550,354 @@ async function deleteInternalExpense(id) {
     renderInternalExpenses();
     renderDashboard();
     showToast('Data dihapus', 'error');
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+// ========== CICILAN ==========
+const STORAGE_KEY_CICILAN_CATS = 'qrents_cicilan_cats';
+const DEFAULT_CICILAN_CATS = ['Kendaraan', 'Elektronik', 'Properti', 'Kartu Kredit', 'Pinjaman', 'Lainnya'];
+
+function getCicilanCategories() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_CICILAN_CATS);
+    return stored ? JSON.parse(stored) : [...DEFAULT_CICILAN_CATS];
+  } catch { return [...DEFAULT_CICILAN_CATS]; }
+}
+
+function saveCicilanCategories(cats) {
+  localStorage.setItem(STORAGE_KEY_CICILAN_CATS, JSON.stringify(cats));
+}
+
+function populateCicilanCategorySelect() {
+  const cats = getCicilanCategories();
+  const sel = document.getElementById('cicilanCategory');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Pilih Kategori —</option>';
+  cats.forEach(c => { sel.innerHTML += `<option value="${c}">${c}</option>`; });
+  sel.innerHTML += '<option value="__new__">+ Tambah Kategori Baru...</option>';
+}
+
+function onCicilanCategoryChange() {
+  const sel = document.getElementById('cicilanCategory');
+  const wrap = document.getElementById('cicilanNewCategoryWrap');
+  if (sel.value === '__new__') {
+    wrap.style.display = 'block';
+    document.getElementById('cicilanNewCategory').focus();
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function addCicilanCategory() {
+  const input = document.getElementById('cicilanNewCategory');
+  const newCat = input.value.trim();
+  if (!newCat) { showToast('Isi nama kategori terlebih dahulu', 'error'); return; }
+  const cats = getCicilanCategories();
+  if (cats.includes(newCat)) { showToast('Kategori sudah ada', 'error'); return; }
+  cats.push(newCat);
+  saveCicilanCategories(cats);
+  populateCicilanCategorySelect();
+  document.getElementById('cicilanCategory').value = newCat;
+  document.getElementById('cicilanNewCategoryWrap').style.display = 'none';
+  input.value = '';
+  showToast('Kategori baru ditambahkan ✓');
+}
+
+function autoCalcCicilanBulanan() {
+  const total = parseFloat(document.getElementById('cicilanTotalAmount').value) || 0;
+  const bulan = parseInt(document.getElementById('cicilanTotalBulan').value) || 0;
+  const bulanan = document.getElementById('cicilanBulanan');
+  if (total > 0 && bulan > 0) {
+    bulanan.value = Math.ceil(total / bulan);
+  } else {
+    bulanan.value = '';
+  }
+}
+
+async function populateCicilanFilters() {
+  // Category filter
+  const cats = getCicilanCategories();
+  const catSel = document.getElementById('filterCicilanCategory');
+  if (catSel) {
+    catSel.innerHTML = '<option value="">Semua Kategori</option>';
+    cats.forEach(c => { catSel.innerHTML += `<option value="${c}">${c}</option>`; });
+  }
+
+  // Month filter
+  const mSel = document.getElementById('filterCicilanMonth');
+  if (mSel) {
+    mSel.innerHTML = '<option value="">Semua Bulan</option>';
+    fullMonth.forEach((m, i) => { mSel.innerHTML += `<option value="${i}">${m}</option>`; });
+  }
+
+  // Year filter
+  const ySel = document.getElementById('filterCicilanYear');
+  if (ySel) {
+    ySel.innerHTML = '<option value="">Semua Tahun</option>';
+    const now = new Date();
+    for (let y = now.getFullYear() + 1; y >= now.getFullYear() - 4; y--) {
+      ySel.innerHTML += `<option value="${y}">${y}</option>`;
+    }
+  }
+}
+
+async function renderCicilan() {
+  try {
+    let data = await API.get('/cicilan');
+    const fCat    = document.getElementById('filterCicilanCategory')?.value;
+    const fStatus = document.getElementById('filterCicilanStatus')?.value;
+    const fMonth  = document.getElementById('filterCicilanMonth')?.value;
+    const fYear   = document.getElementById('filterCicilanYear')?.value;
+
+    if (fCat)    data = data.filter(c => c.category === fCat);
+    if (fMonth !== '' && fMonth !== undefined) data = data.filter(c => new Date(c.date).getMonth() == fMonth);
+    if (fYear)   data = data.filter(c => new Date(c.date).getFullYear() == fYear);
+
+    // Compute derived fields
+    data = data.map(c => {
+      const totalPaid = (c.payments || []).reduce((s, p) => s + p.amount, 0);
+      const sisaBayar = Math.max(0, c.totalAmount - totalPaid);
+      const sisaBulan = sisaBayar > 0 ? Math.ceil(sisaBayar / c.bulanan) : 0;
+      const status    = sisaBayar <= 0 ? 'lunas' : 'aktif';
+      return { ...c, totalPaid, sisaBayar, sisaBulan, status };
+    });
+
+    if (fStatus) data = data.filter(c => c.status === fStatus);
+
+    data.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Summary cards
+    const aktif = data.filter(c => c.status === 'aktif');
+    const now = new Date();
+    const bulanIni = aktif.filter(c => {
+      const d = new Date(c.date);
+      return d.getMonth() <= now.getMonth() && d.getFullYear() <= now.getFullYear();
+    });
+    document.getElementById('cicilanStatTotal').textContent = fmt(aktif.reduce((s, c) => s + c.bulanan, 0));
+    document.getElementById('cicilanStatCount').textContent = `${aktif.length} cicilan aktif`;
+    document.getElementById('cicilanStatBulanIni').textContent = fmt(bulanIni.reduce((s, c) => s + c.bulanan, 0));
+    document.getElementById('cicilanStatBulanIniCount').textContent = `${bulanIni.length} cicilan berjalan`;
+    document.getElementById('cicilanStatSisa').textContent = fmt(aktif.reduce((s, c) => s + c.sisaBayar, 0));
+    document.getElementById('cicilanStatSisaCount').textContent = 'dari semua cicilan aktif';
+
+    const tbody = document.getElementById('cicilanTable');
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">💳</div><div class="empty-state-title">Belum ada data cicilan</div><div class="empty-state-sub">Klik "+ Tambah Cicilan" untuk mulai</div></div></td></tr>`;
+    } else {
+      tbody.innerHTML = data.map(c => `
+        <tr style="cursor:pointer;" onclick="openCicilanDetail('${c._id}')">
+          <td>${fmtDate(c.date)}</td>
+          <td><strong>${c.name}</strong>${c.note ? `<div style="font-size:0.78rem;color:var(--text2);">${c.note}</div>` : ''}</td>
+          <td><span style="background:rgba(201,168,76,0.12);color:var(--gold);padding:2px 8px;border-radius:20px;font-size:0.8rem;">${c.category || '—'}</span></td>
+          <td class="amount-negative">-${fmt(c.bulanan)}</td>
+          <td style="text-align:center;">${c.totalBulan}</td>
+          <td style="text-align:center;">${c.status === 'lunas' ? '<span style="color:var(--green);">✓ Lunas</span>' : c.sisaBulan}</td>
+          <td class="${c.sisaBayar > 0 ? 'amount-negative' : 'amount-positive'}">${c.sisaBayar > 0 ? fmt(c.sisaBayar) : '✓ Lunas'}</td>
+          <td><span class="status-badge ${c.status === 'lunas' ? 'terisi' : 'kosong'}">${c.status}</span></td>
+          <td onclick="event.stopPropagation()">
+            <button class="btn btn-outline btn-sm" onclick="editCicilan('${c._id}')">✏</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteCicilan('${c._id}')">🗑</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+function openAddCicilan() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('cicilanId').value = '';
+  document.getElementById('formCicilan').reset();
+  document.getElementById('cicilanDate').value = today;
+  document.getElementById('cicilanBulanan').value = '';
+  document.getElementById('modalCicilanTitle').textContent = 'Tambah Cicilan';
+  populateCicilanCategorySelect();
+  document.getElementById('cicilanNewCategoryWrap').style.display = 'none';
+  openModal('modalCicilan');
+}
+
+async function editCicilan(id) {
+  try {
+    const c = await API.get(`/cicilan/${id}`);
+    document.getElementById('cicilanId').value = c._id;
+    document.getElementById('cicilanDate').value = c.date.split('T')[0];
+    document.getElementById('cicilanName').value = c.name;
+    document.getElementById('cicilanTotalAmount').value = c.totalAmount;
+    document.getElementById('cicilanTotalBulan').value = c.totalBulan;
+    document.getElementById('cicilanBulanan').value = c.bulanan;
+    document.getElementById('cicilanBunga').value = c.bunga || '';
+    document.getElementById('cicilanNote').value = c.note || '';
+    document.getElementById('modalCicilanTitle').textContent = 'Edit Cicilan';
+    populateCicilanCategorySelect();
+    const catSel = document.getElementById('cicilanCategory');
+    if (c.category) catSel.value = c.category;
+    document.getElementById('cicilanNewCategoryWrap').style.display = 'none';
+    openModal('modalCicilan');
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function saveCicilan(e) {
+  e.preventDefault();
+  try {
+    const id = document.getElementById('cicilanId').value;
+    const catVal = document.getElementById('cicilanCategory').value;
+    if (!catVal || catVal === '__new__') {
+      showToast('Pilih atau buat kategori terlebih dahulu', 'error'); return;
+    }
+    const totalAmount = parseFloat(document.getElementById('cicilanTotalAmount').value);
+    const totalBulan  = parseInt(document.getElementById('cicilanTotalBulan').value);
+    const bulanan     = Math.ceil(totalAmount / totalBulan);
+    const data = {
+      date:        document.getElementById('cicilanDate').value,
+      name:        document.getElementById('cicilanName').value.trim(),
+      category:    catVal,
+      totalAmount,
+      totalBulan,
+      bulanan,
+      bunga:       parseFloat(document.getElementById('cicilanBunga').value) || 0,
+      note:        document.getElementById('cicilanNote').value.trim(),
+    };
+    if (id) {
+      await API.put(`/cicilan/${id}`, data);
+      showToast('Cicilan diperbarui ✓');
+    } else {
+      await API.post('/cicilan', data);
+      showToast('Cicilan berhasil ditambahkan ✓');
+    }
+    closeModal('modalCicilan');
+    populateCicilanFilters();
+    renderCicilan();
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function deleteCicilan(id) {
+  if (!confirm('Hapus data cicilan ini beserta semua riwayat pembayarannya?')) return;
+  try {
+    await API.delete(`/cicilan/${id}`);
+    renderCicilan();
+    showToast('Cicilan dihapus', 'error');
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function openCicilanDetail(id) {
+  try {
+    const c = await API.get(`/cicilan/${id}`);
+    const totalPaid = (c.payments || []).reduce((s, p) => s + p.amount, 0);
+    const sisaBayar = Math.max(0, c.totalAmount - totalPaid);
+    const sisaBulan = sisaBayar > 0 ? Math.ceil(sisaBayar / c.bulanan) : 0;
+    const persen    = Math.min(100, Math.round((totalPaid / c.totalAmount) * 100));
+    const status    = sisaBayar <= 0 ? 'lunas' : 'aktif';
+
+    document.getElementById('modalCicilanDetailTitle').textContent = c.name;
+    document.getElementById('cicilanPaymentCicilanId').value = c._id;
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('cicilanPaymentDate').value = today;
+    document.getElementById('cicilanPaymentAmount').value = c.bulanan;
+    document.getElementById('cicilanPaymentNote').value = '';
+
+    const payments = [...(c.payments || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const content = document.getElementById('cicilanDetailContent');
+    content.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;padding-top:16px;">
+        <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+          <div style="font-size:0.75rem;color:var(--text2);margin-bottom:4px;">Cicilan/Bulan</div>
+          <div style="font-weight:700;color:var(--red);font-size:1.05rem;">-${fmt(c.bulanan)}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+          <div style="font-size:0.75rem;color:var(--text2);margin-bottom:4px;">Total Cicilan</div>
+          <div style="font-weight:700;font-size:1.05rem;">${fmt(c.totalAmount)}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+          <div style="font-size:0.75rem;color:var(--text2);margin-bottom:4px;">Sudah Dibayar</div>
+          <div style="font-weight:700;color:var(--green);font-size:1.05rem;">${fmt(totalPaid)}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+          <div style="font-size:0.75rem;color:var(--text2);margin-bottom:4px;">Sisa Bayar</div>
+          <div style="font-weight:700;color:${sisaBayar > 0 ? 'var(--red)' : 'var(--green)'};font-size:1.05rem;">${sisaBayar > 0 ? fmt(sisaBayar) : '✓ Lunas'}</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:6px;display:flex;justify-content:space-between;font-size:0.8rem;">
+        <span style="color:var(--text2);">Progress Pembayaran</span>
+        <span style="color:var(--gold);font-weight:600;">${persen}%</span>
+      </div>
+      <div style="background:var(--bg3);border-radius:99px;height:8px;overflow:hidden;margin-bottom:16px;">
+        <div style="height:100%;width:${persen}%;background:linear-gradient(90deg,var(--gold),var(--green));border-radius:99px;transition:width 0.4s;"></div>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+        <span style="background:rgba(201,168,76,0.12);color:var(--gold);padding:3px 10px;border-radius:20px;font-size:0.8rem;">${c.category || '—'}</span>
+        <span style="background:var(--bg3);color:var(--text2);padding:3px 10px;border-radius:20px;font-size:0.8rem;">${c.totalBulan} bulan total</span>
+        <span style="background:var(--bg3);color:var(--text2);padding:3px 10px;border-radius:20px;font-size:0.8rem;">${sisaBulan} bulan sisa</span>
+        ${c.bunga ? `<span style="background:rgba(245,101,101,0.1);color:var(--red);padding:3px 10px;border-radius:20px;font-size:0.8rem;">Bunga ${c.bunga}%/thn</span>` : ''}
+        <span class="status-badge ${status === 'lunas' ? 'terisi' : 'kosong'}">${status}</span>
+      </div>
+
+      ${c.note ? `<div style="background:var(--bg3);border-radius:8px;padding:10px 14px;font-size:0.85rem;color:var(--text2);margin-bottom:16px;">📝 ${c.note}</div>` : ''}
+
+      <div style="font-weight:600;margin-bottom:10px;color:var(--text);">Riwayat Pembayaran</div>
+      ${payments.length === 0
+        ? `<div style="text-align:center;color:var(--text3);padding:20px 0;font-size:0.88rem;">Belum ada pembayaran tercatat</div>`
+        : `<div style="max-height:200px;overflow-y:auto;">
+          ${payments.map(p => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">
+              <div>
+                <div style="font-size:0.88rem;font-weight:500;">${fmtDate(p.date)}</div>
+                <div style="font-size:0.78rem;color:var(--text2);">${p.note || '—'}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="color:var(--green);font-weight:600;">+${fmt(p.amount)}</span>
+                <button class="btn btn-danger btn-sm" onclick="deleteCicilanPayment('${c._id}','${p._id}')">🗑</button>
+              </div>
+            </div>
+          `).join('')}
+          </div>`
+      }
+    `;
+
+    openModal('modalCicilanDetail');
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function saveCicilanPayment(e) {
+  e.preventDefault();
+  try {
+    const cicilanId = document.getElementById('cicilanPaymentCicilanId').value;
+    const data = {
+      date:   document.getElementById('cicilanPaymentDate').value,
+      amount: parseFloat(document.getElementById('cicilanPaymentAmount').value),
+      note:   document.getElementById('cicilanPaymentNote').value.trim(),
+    };
+    await API.post(`/cicilan/${cicilanId}/payments`, data);
+    showToast('Pembayaran berhasil dicatat ✓');
+    document.getElementById('formCicilanPayment').reset();
+    await openCicilanDetail(cicilanId);
+    renderCicilan();
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function deleteCicilanPayment(cicilanId, paymentId) {
+  if (!confirm('Hapus catatan pembayaran ini?')) return;
+  try {
+    await API.delete(`/cicilan/${cicilanId}/payments/${paymentId}`);
+    showToast('Pembayaran dihapus', 'error');
+    await openCicilanDetail(cicilanId);
+    renderCicilan();
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
   }
