@@ -27,11 +27,11 @@ router.get('/:id', auth, async (req, res) => {
 // POST tambah baru
 router.post('/', auth, async (req, res) => {
   try {
-    const { date, name, amount, note } = req.body;
+    const { date, name, amount, category, note } = req.body; // FIX: tambah category
     if (!date || !name || !amount) {
       return res.status(400).json({ message: 'Tanggal, nama, dan jumlah wajib diisi' });
     }
-    const item = new InternalExpense({ userId: req.userId, date, name, amount, note });
+    const item = new InternalExpense({ userId: req.userId, date, name, amount, category, note }); // FIX: tambah category
     await item.save();
     res.status(201).json(item);
   } catch (err) {
@@ -42,10 +42,10 @@ router.post('/', auth, async (req, res) => {
 // PUT edit
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { date, name, amount, note } = req.body;
+    const { date, name, amount, category, note } = req.body; // FIX: tambah category
     const item = await InternalExpense.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },
-      { date, name, amount, note },
+      { date, name, amount, category, note }, // FIX: tambah category
       { new: true }
     );
     if (!item) return res.status(404).json({ message: 'Data tidak ditemukan' });
