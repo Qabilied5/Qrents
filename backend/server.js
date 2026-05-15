@@ -13,12 +13,14 @@ app.use(express.json());
 // 2. Koneksi Database
 connectDB();
 
-// 3. Rute API (Harus di atas Wildcard '*')
+// 3. Rute API
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/properties', require('./routes/properties'));
 app.use('/api/tenants', require('./routes/tenants'));
 app.use('/api/income', require('./routes/income'));
 app.use('/api/expenses', require('./routes/expenses'));
+app.use('/api/internal-incomes', require('./routes/internalIncomes'));
+app.use('/api/internal-expenses', require('./routes/internalExpenses'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK' });
