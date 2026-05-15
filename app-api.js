@@ -961,11 +961,12 @@ async function renderInternalIncomes() {
 
     const tbody = document.getElementById('internalIncomeTable');
     if (data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">💰</div><div class="empty-state-title">Belum ada data kas masuk</div></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">💰</div><div class="empty-state-title">Belum ada data kas masuk</div></div></td></tr>`;
     } else {
       tbody.innerHTML = data.map(i => `
         <tr>
           <td>${fmtDate(i.date)}</td>
+          <td><span style="background:rgba(var(--green-rgb,80,200,120),0.12);color:var(--green,#50c878);padding:2px 8px;border-radius:20px;font-size:0.8rem;white-space:nowrap;">${i.category || '—'}</span></td>
           <td>${i.name}</td>
           <td class="amount-positive">+${fmt(i.amount)}</td>
           <td>${i.note || '—'}</td>
@@ -989,6 +990,12 @@ function openAddInternalIncome() {
   document.getElementById('formInternalIncome').reset();
   document.getElementById('intIncDate').value = today;
   document.getElementById('modalInternalIncomeTitle').textContent = 'Catat Kas Masuk';
+  populateIntCategorySelect('intIncCategory', 'intIncNewCategoryWrap', STORAGE_KEY_INC, DEFAULT_INC_CATS);
+  // Jika belum ada kategori sama sekali, langsung tampilkan form buat baru
+  const cats = getIntCategories(STORAGE_KEY_INC, DEFAULT_INC_CATS);
+  if (cats.length === 0) {
+    document.getElementById('intIncNewCategoryWrap').style.display = 'block';
+  }
   openModal('modalInternalIncome');
 }
 
@@ -1001,6 +1008,20 @@ async function editInternalIncome(id) {
     document.getElementById('intIncAmount').value = item.amount;
     document.getElementById('intIncNote').value = item.note || '';
     document.getElementById('modalInternalIncomeTitle').textContent = 'Edit Kas Masuk';
+
+    // Populate kategori, lalu set nilai tersimpan
+    populateIntCategorySelect('intIncCategory', 'intIncNewCategoryWrap', STORAGE_KEY_INC, DEFAULT_INC_CATS);
+    const catSel = document.getElementById('intIncCategory');
+    if (item.category) {
+      // Pastikan opsi ada; jika tidak, tambahkan sementara
+      if (![...catSel.options].some(o => o.value === item.category)) {
+        const opt = new Option(item.category, item.category);
+        catSel.insertBefore(opt, catSel.options[catSel.options.length - 1]);
+      }
+      catSel.value = item.category;
+    }
+    document.getElementById('intIncNewCategoryWrap').style.display = 'none';
+
     openModal('modalInternalIncome');
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
@@ -1011,11 +1032,17 @@ async function saveInternalIncome(e) {
   e.preventDefault();
   try {
     const id = document.getElementById('internalIncomeId').value;
+    const catVal = document.getElementById('intIncCategory').value;
+    if (!catVal || catVal === '__new__') {
+      showToast('Pilih atau buat jenis pemasukan terlebih dahulu', 'error');
+      return;
+    }
     const data = {
-      date:   document.getElementById('intIncDate').value,
-      name:   document.getElementById('intIncName').value.trim(),
-      amount: parseFloat(document.getElementById('intIncAmount').value),
-      note:   document.getElementById('intIncNote').value.trim(),
+      date:     document.getElementById('intIncDate').value,
+      name:     document.getElementById('intIncName').value.trim(),
+      amount:   parseFloat(document.getElementById('intIncAmount').value),
+      note:     document.getElementById('intIncNote').value.trim(),
+      category: catVal,
     };
     if (id) {
       await API.put(`/internal-incomes/${id}`, data);
@@ -1042,6 +1069,106 @@ async function deleteInternalIncome(id) {
   }
 }
 
+// ========== INTERNAL CATEGORY HELPERS ==========
+// Jenis disimpan di localStorage agar persisten tanpa endpoint baru
+
+const STORAGE_KEY_INC = 'qrents_intInc_categories';
+const STORAGE_KEY_EXP = 'qrents_intExp_categories';
+
+const DEFAULT_INC_CATS = ['Hutang Dibayar', 'Pinjaman Diterima', 'Hasil Usaha Lain', 'Transfer Masuk'];
+const DEFAULT_EXP_CATS = ['Kebutuhan Rumah Tangga', 'Makan & Minum', 'Transportasi', 'Kesehatan', 'Pendidikan', 'Tagihan & Utilitas', 'Hiburan', 'Lainnya'];
+
+function getIntCategories(key, defaults) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [...defaults];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [...defaults];
+  } catch { return [...defaults]; }
+}
+
+function saveIntCategories(key, cats) {
+  localStorage.setItem(key, JSON.stringify(cats));
+}
+
+function populateIntCategorySelect(selectId, wrapId, key, defaults) {
+  const sel  = document.getElementById(selectId);
+  const wrap = document.getElementById(wrapId);
+  if (!sel) return;
+
+  const cats = getIntCategories(key, defaults);
+  sel.innerHTML = '<option value="">— Pilih Jenis —</option>';
+  cats.forEach(c => {
+    sel.innerHTML += `<option value="${c}">${c}</option>`;
+  });
+  // Option untuk buat jenis baru
+  sel.innerHTML += '<option value="__new__">＋ Buat Jenis Baru...</option>';
+
+  // Tampilkan wrap "buat baru" hanya jika belum ada kategori sama sekali
+  if (wrap) {
+    wrap.style.display = (cats.length === 0) ? 'block' : 'none';
+  }
+}
+
+// Kas Masuk
+function onIntIncCategoryChange() {
+  const sel  = document.getElementById('intIncCategory');
+  const wrap = document.getElementById('intIncNewCategoryWrap');
+  if (!sel || !wrap) return;
+  wrap.style.display = sel.value === '__new__' ? 'block' : 'none';
+  if (sel.value === '__new__') {
+    document.getElementById('intIncNewCategory').focus();
+  }
+}
+
+function addIntIncCategory() {
+  const input = document.getElementById('intIncNewCategory');
+  const name  = input ? input.value.trim() : '';
+  if (!name) { showToast('Nama jenis tidak boleh kosong', 'error'); return; }
+
+  const cats = getIntCategories(STORAGE_KEY_INC, DEFAULT_INC_CATS);
+  if (cats.includes(name)) { showToast('Jenis sudah ada', 'error'); return; }
+
+  cats.push(name);
+  saveIntCategories(STORAGE_KEY_INC, cats);
+
+  // Refresh select & pilih yang baru
+  populateIntCategorySelect('intIncCategory', 'intIncNewCategoryWrap', STORAGE_KEY_INC, DEFAULT_INC_CATS);
+  document.getElementById('intIncCategory').value = name;
+  document.getElementById('intIncNewCategoryWrap').style.display = 'none';
+  if (input) input.value = '';
+  showToast(`Jenis "${name}" ditambahkan ✓`);
+}
+
+// Kas Keluar
+function onIntExpCategoryChange() {
+  const sel  = document.getElementById('intExpCategory');
+  const wrap = document.getElementById('intExpNewCategoryWrap');
+  if (!sel || !wrap) return;
+  wrap.style.display = sel.value === '__new__' ? 'block' : 'none';
+  if (sel.value === '__new__') {
+    document.getElementById('intExpNewCategory').focus();
+  }
+}
+
+function addIntExpCategory() {
+  const input = document.getElementById('intExpNewCategory');
+  const name  = input ? input.value.trim() : '';
+  if (!name) { showToast('Nama jenis tidak boleh kosong', 'error'); return; }
+
+  const cats = getIntCategories(STORAGE_KEY_EXP, DEFAULT_EXP_CATS);
+  if (cats.includes(name)) { showToast('Jenis sudah ada', 'error'); return; }
+
+  cats.push(name);
+  saveIntCategories(STORAGE_KEY_EXP, cats);
+
+  populateIntCategorySelect('intExpCategory', 'intExpNewCategoryWrap', STORAGE_KEY_EXP, DEFAULT_EXP_CATS);
+  document.getElementById('intExpCategory').value = name;
+  document.getElementById('intExpNewCategoryWrap').style.display = 'none';
+  if (input) input.value = '';
+  showToast(`Jenis "${name}" ditambahkan ✓`);
+}
+
 // ========== INTERNAL EXPENSES ==========
 async function renderInternalExpenses() {
   try {
@@ -1056,11 +1183,12 @@ async function renderInternalExpenses() {
 
     const tbody = document.getElementById('internalExpenseTable');
     if (data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">🛒</div><div class="empty-state-title">Belum ada data kas keluar</div></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">🛒</div><div class="empty-state-title">Belum ada data kas keluar</div></div></td></tr>`;
     } else {
       tbody.innerHTML = data.map(i => `
         <tr>
           <td>${fmtDate(i.date)}</td>
+          <td><span style="background:rgba(var(--red-rgb,224,85,85),0.12);color:var(--red,#e05555);padding:2px 8px;border-radius:20px;font-size:0.8rem;white-space:nowrap;">${i.category || '—'}</span></td>
           <td>${i.name}</td>
           <td class="amount-negative">-${fmt(i.amount)}</td>
           <td>${i.note || '—'}</td>
@@ -1084,6 +1212,11 @@ function openAddInternalExpense() {
   document.getElementById('formInternalExpense').reset();
   document.getElementById('intExpDate').value = today;
   document.getElementById('modalInternalExpenseTitle').textContent = 'Catat Kas Keluar';
+  populateIntCategorySelect('intExpCategory', 'intExpNewCategoryWrap', STORAGE_KEY_EXP, DEFAULT_EXP_CATS);
+  const cats = getIntCategories(STORAGE_KEY_EXP, DEFAULT_EXP_CATS);
+  if (cats.length === 0) {
+    document.getElementById('intExpNewCategoryWrap').style.display = 'block';
+  }
   openModal('modalInternalExpense');
 }
 
@@ -1096,6 +1229,18 @@ async function editInternalExpense(id) {
     document.getElementById('intExpAmount').value = item.amount;
     document.getElementById('intExpNote').value = item.note || '';
     document.getElementById('modalInternalExpenseTitle').textContent = 'Edit Kas Keluar';
+
+    populateIntCategorySelect('intExpCategory', 'intExpNewCategoryWrap', STORAGE_KEY_EXP, DEFAULT_EXP_CATS);
+    const catSel = document.getElementById('intExpCategory');
+    if (item.category) {
+      if (![...catSel.options].some(o => o.value === item.category)) {
+        const opt = new Option(item.category, item.category);
+        catSel.insertBefore(opt, catSel.options[catSel.options.length - 1]);
+      }
+      catSel.value = item.category;
+    }
+    document.getElementById('intExpNewCategoryWrap').style.display = 'none';
+
     openModal('modalInternalExpense');
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
@@ -1106,11 +1251,17 @@ async function saveInternalExpense(e) {
   e.preventDefault();
   try {
     const id = document.getElementById('internalExpenseId').value;
+    const catVal = document.getElementById('intExpCategory').value;
+    if (!catVal || catVal === '__new__') {
+      showToast('Pilih atau buat jenis pengeluaran terlebih dahulu', 'error');
+      return;
+    }
     const data = {
-      date:   document.getElementById('intExpDate').value,
-      name:   document.getElementById('intExpName').value.trim(),
-      amount: parseFloat(document.getElementById('intExpAmount').value),
-      note:   document.getElementById('intExpNote').value.trim(),
+      date:     document.getElementById('intExpDate').value,
+      name:     document.getElementById('intExpName').value.trim(),
+      amount:   parseFloat(document.getElementById('intExpAmount').value),
+      note:     document.getElementById('intExpNote').value.trim(),
+      category: catVal,
     };
     if (id) {
       await API.put(`/internal-expenses/${id}`, data);
