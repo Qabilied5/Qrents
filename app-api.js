@@ -393,6 +393,16 @@ async function renderTenants() {
       const end = t.end ? new Date(t.end) : null;
       const isActive = !end || end >= now;
       const daysLeft = end ? Math.ceil((end - now) / (1000*60*60*24)) : null;
+
+      // Auto-renew: jika tanggal akhir = hari ini (daysLeft <= 0), perpanjang +30 hari
+      if (end && daysLeft !== null && daysLeft <= 0) {
+        const newEnd = new Date(end);
+        newEnd.setDate(newEnd.getDate() + 30);
+        const newEndStr = newEnd.toISOString().split('T')[0];
+        API.put(`/tenants/${t._id}`, { ...t, propertyId: t.propertyId?._id || t.propertyId, end: newEndStr })
+          .then(() => renderTenants())
+          .catch(() => {}); // silent — tidak ganggu tampilan
+      }
       return `
         <tr class="tenant-row" onclick="showTenantPayments('${t._id}', '${(t.name||'').replace(/'/g,'\\\'')}')" style="cursor:pointer;" title="Klik untuk lihat riwayat pembayaran">
           <td>
@@ -404,7 +414,7 @@ async function renderTenants() {
           <td>${t.propertyId?.name || '—'}</td>
           <td>${t.phone}</td>
           <td>${fmtDate(t.start)}</td>
-          <td>${fmtDate(t.end)}${daysLeft !== null && daysLeft >= 0 && daysLeft <= 30 ? `<br><small style="color:var(--red)">⚠ ${daysLeft} hari lagi</small>` : ''}</td>
+          <td>${fmtDate(t.end)}${daysLeft !== null && daysLeft >= 0 && daysLeft <= 30 ? `<br><small style="color:var(--red)">⚠ ${daysLeft} hari tersisa</small>` : ''}</td>
           <td>${fmt(t.rent)}</td>
           <td><span class="status-badge ${isActive ? 'terisi' : 'kosong'}">${isActive ? 'Aktif' : 'Habis'}</span></td>
           <td onclick="event.stopPropagation()">
@@ -511,6 +521,8 @@ async function editTenant(id) {
     document.getElementById('tenantProperty').value = t.propertyId._id;
     document.getElementById('tenantStart').value = t.start.split('T')[0];
     document.getElementById('tenantEnd').value = t.end ? t.end.split('T')[0] : '';
+    // Jika belum ada tanggal akhir, set otomatis +30 hari dari tanggal mulai
+    if (!t.end && typeof autoSetTenantEnd === 'function') autoSetTenantEnd();
     document.getElementById('tenantRent').value = t.rent;
     document.getElementById('tenantDeposit').value = t.deposit || '';
     document.getElementById('tenantNotes').value = t.notes || '';
