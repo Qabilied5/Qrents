@@ -40,6 +40,44 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<style>
+/* ===== REPORT PERIOD BUTTONS ===== */
+.report-period-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.period-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border, #2e3347);
+  background: transparent;
+  color: var(--text2, #8b90a4);
+  font-size: 0.82rem;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+.period-btn:hover {
+  border-color: var(--gold, #c9a84c);
+  color: var(--gold, #c9a84c);
+}
+.period-btn.active {
+  background: var(--gold, #c9a84c);
+  border-color: var(--gold, #c9a84c);
+  color: #0f0f13;
+  font-weight: 700;
+}
+/* Kas summary rows reuse report-prop-row layout */
+#reportKasSummary .report-prop-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+}
+</style>
 </head>
 <body>
 
@@ -449,18 +487,32 @@
       <button class="btn btn-outline" onclick="exportReport()">⬇ Export CSV</button>
     </div>
 
-    <div class="filter-bar">
-      <select id="reportYear" onchange="renderReports()">
+    <!-- Filter Bar -->
+    <div class="filter-bar" style="flex-wrap:wrap;gap:8px;align-items:center;">
+      <!-- Quick Period Buttons -->
+      <div class="report-period-btns" id="reportPeriodBtns">
+        <button class="period-btn" data-period="month" onclick="setReportPeriod('month')">Bulan Ini</button>
+        <button class="period-btn" data-period="3month" onclick="setReportPeriod('3month')">3 Bulan</button>
+        <button class="period-btn" data-period="6month" onclick="setReportPeriod('6month')">6 Bulan</button>
+        <button class="period-btn active" data-period="year" onclick="setReportPeriod('year')">Tahunan</button>
+      </div>
+      <!-- Year selector (shown when period=year) -->
+      <select id="reportYear" onchange="renderReports()" style="display:none;">
       </select>
+      <!-- Month selector (shown when period=month) -->
+      <select id="reportMonth" onchange="renderReports()" style="display:none;">
+      </select>
+      <!-- Period label -->
+      <span id="reportPeriodLabel" style="color:var(--gold,#c9a84c);font-size:0.85rem;font-weight:500;margin-left:4px;"></span>
     </div>
 
     <div class="stats-grid" style="margin-bottom:2rem;">
       <div class="stat-card accent-green">
-        <div class="stat-label">Total Pendapatan Tahunan</div>
+        <div class="stat-label" id="rep-income-label">Total Pendapatan</div>
         <div class="stat-value" id="rep-income">Rp 0</div>
       </div>
       <div class="stat-card accent-red">
-        <div class="stat-label">Total Pengeluaran Tahunan</div>
+        <div class="stat-label" id="rep-expense-label">Total Pengeluaran</div>
         <div class="stat-value" id="rep-expense">Rp 0</div>
       </div>
       <div class="stat-card accent-gold">
@@ -475,12 +527,24 @@
 
     <div class="dash-grid">
       <div class="card">
-        <div class="card-header"><h3>Pendapatan per Bulan</h3></div>
+        <div class="card-header"><h3 id="reportChartTitle">Pendapatan per Bulan</h3></div>
         <div class="chart-container"><canvas id="reportChart"></canvas></div>
       </div>
       <div class="card">
         <div class="card-header"><h3>Ringkasan per Properti</h3></div>
         <div id="reportPropertyTable"></div>
+      </div>
+    </div>
+
+    <!-- Ringkasan Kas -->
+    <div class="dash-grid" style="margin-top:1.5rem;">
+      <div class="card">
+        <div class="card-header"><h3>Ringkasan Kas</h3></div>
+        <div id="reportKasTable"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Saldo Kas Bersih</h3></div>
+        <div id="reportKasSummary"></div>
       </div>
     </div>
   </section>

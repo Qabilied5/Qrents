@@ -848,19 +848,99 @@ async function deleteExpense(id) {
 
 // ========== REPORTS ==========
 let reportChartInstance = null;
+let currentReportPeriod = 'year'; // 'month' | '3month' | '6month' | 'year'
+
+function setReportPeriod(period) {
+  currentReportPeriod = period;
+  // Update active button
+  document.querySelectorAll('.period-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.period === period);
+  });
+  // Show/hide year & month selectors
+  const selY = document.getElementById('reportYear');
+  const selM = document.getElementById('reportMonth');
+  if (period === 'year') {
+    selY.style.display = '';
+    selM.style.display = 'none';
+  } else if (period === 'month') {
+    selY.style.display = '';
+    selM.style.display = '';
+  } else {
+    selY.style.display = 'none';
+    selM.style.display = 'none';
+  }
+  renderReports();
+}
+
+function getReportDateRange() {
+  const now = new Date();
+  const period = currentReportPeriod;
+
+  if (period === 'month') {
+    const y = parseInt(document.getElementById('reportYear').value) || now.getFullYear();
+    const m = document.getElementById('reportMonth').value !== ''
+      ? parseInt(document.getElementById('reportMonth').value)
+      : now.getMonth();
+    const start = new Date(y, m, 1);
+    const end   = new Date(y, m + 1, 0, 23, 59, 59);
+    return { start, end, period, label: `${fullMonth[m]} ${y}` };
+  }
+
+  if (period === '3month') {
+    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    return { start, end, period, label: `${fullMonth[start.getMonth()]} – ${fullMonth[now.getMonth()]} ${now.getFullYear()}` };
+  }
+
+  if (period === '6month') {
+    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    return { start, end, period, label: `${fullMonth[start.getMonth()]} – ${fullMonth[now.getMonth()]} ${now.getFullYear()}` };
+  }
+
+  // year (default)
+  const year  = parseInt(document.getElementById('reportYear').value) || now.getFullYear();
+  const start = new Date(year, 0, 1);
+  const end   = new Date(year, 11, 31, 23, 59, 59);
+  return { start, end, period: 'year', label: `Tahun ${year}`, year };
+}
 
 async function renderReports() {
   try {
     const now = new Date();
+
+    // Populate year selector
     const selY = document.getElementById('reportYear');
-    if (selY.options.length <= 1) {
-      selY.innerHTML = '';
+    if (selY.options.length === 0) {
       for (let y = now.getFullYear(); y >= now.getFullYear() - 4; y--) {
         selY.innerHTML += `<option value="${y}">${y}</option>`;
       }
     }
 
-    const year = parseInt(document.getElementById('reportYear').value) || now.getFullYear();
+    // Populate month selector
+    const selM = document.getElementById('reportMonth');
+    if (selM.options.length === 0) {
+      fullMonth.forEach((m, i) => {
+        selM.innerHTML += `<option value="${i}"${i === now.getMonth() ? ' selected' : ''}>${m}</option>`;
+      });
+    }
+
+    // Sync visibility based on current period
+    const period = currentReportPeriod;
+    if (period === 'year') {
+      selY.style.display = '';
+      selM.style.display = 'none';
+    } else if (period === 'month') {
+      selY.style.display = '';
+      selM.style.display = '';
+    } else {
+      selY.style.display = 'none';
+      selM.style.display = 'none';
+    }
+
+    const range = getReportDateRange();
+    document.getElementById('reportPeriodLabel').textContent = range.label;
+
     const [allIncome, allExpenses, allIntIncomes, allIntExpenses, props] = await Promise.all([
       API.get('/income'),
       API.get('/expenses'),
@@ -868,16 +948,30 @@ async function renderReports() {
       API.get('/internal-expenses'),
       API.get('/properties'),
     ]);
-    const incomes  = allIncome.filter(i => new Date(i.date).getFullYear() === year);
-    const expenses = allExpenses.filter(i => new Date(i.date).getFullYear() === year);
-    const intIncomes  = allIntIncomes.filter(i => new Date(i.date).getFullYear() === year);
-    const intExpenses = allIntExpenses.filter(i => new Date(i.date).getFullYear() === year);
 
-    const totalIn  = incomes.reduce((s, i) => s + i.amount, 0)
-                   + intIncomes.reduce((s, i) => s + i.amount, 0);
-    const totalOut = expenses.reduce((s, i) => s + i.amount, 0)
-                   + intExpenses.reduce((s, i) => s + i.amount, 0);
-    const occupied = props.filter(p => p.status === 'terisi').length;
+    // Filter by date range
+    const inRange = (dateStr) => {
+      const d = new Date(dateStr);
+      return d >= range.start && d <= range.end;
+    };
+    const incomes     = allIncome.filter(i => inRange(i.date));
+    const expenses    = allExpenses.filter(i => inRange(i.date));
+    const intIncomes  = allIntIncomes.filter(i => inRange(i.date));
+    const intExpenses = allIntExpenses.filter(i => inRange(i.date));
+
+    const totalPropIn  = incomes.reduce((s, i) => s + i.amount, 0);
+    const totalPropOut = expenses.reduce((s, i) => s + i.amount, 0);
+    const totalKasIn   = intIncomes.reduce((s, i) => s + i.amount, 0);
+    const totalKasOut  = intExpenses.reduce((s, i) => s + i.amount, 0);
+    const totalIn      = totalPropIn + totalKasIn;
+    const totalOut     = totalPropOut + totalKasOut;
+    const occupied     = props.filter(p => p.status === 'terisi').length;
+
+    // Update label based on period
+    const labelIn  = period === 'year' ? 'Total Pendapatan Tahunan' : `Total Pendapatan (${range.label})`;
+    const labelOut = period === 'year' ? 'Total Pengeluaran Tahunan' : `Total Pengeluaran (${range.label})`;
+    document.getElementById('rep-income-label').textContent = labelIn;
+    document.getElementById('rep-expense-label').textContent = labelOut;
 
     document.getElementById('rep-income').textContent = fmt(totalIn);
     document.getElementById('rep-expense').textContent = fmt(totalOut);
@@ -885,23 +979,67 @@ async function renderReports() {
     document.getElementById('rep-profit').style.color = totalIn >= totalOut ? 'var(--green)' : 'var(--red)';
     document.getElementById('rep-occupancy').textContent = props.length ? Math.round(occupied / props.length * 100) + '%' : '0%';
 
-    const labels = fullMonth.map(m => m.substring(0, 3));
-    const dataIn = Array(12).fill(0);
-    const dataOut = Array(12).fill(0);
-    incomes.forEach(i => { dataIn[new Date(i.date).getMonth()] += i.amount; });
-    expenses.forEach(i => { dataOut[new Date(i.date).getMonth()] += i.amount; });
-    intIncomes.forEach(i => { dataIn[new Date(i.date).getMonth()] += i.amount; });
-    intExpenses.forEach(i => { dataOut[new Date(i.date).getMonth()] += i.amount; });
+    // ---- CHART ----
+    let labels = [];
+    let dataIn = [];
+    let dataOut = [];
+    let chartType = 'line';
+    let chartTitle = 'Pendapatan per Bulan';
+
+    if (period === 'year') {
+      // 12 monthly bars for the year
+      labels = fullMonth.map(m => m.substring(0, 3));
+      dataIn  = Array(12).fill(0);
+      dataOut = Array(12).fill(0);
+      incomes.forEach(i => { dataIn[new Date(i.date).getMonth()]  += i.amount; });
+      expenses.forEach(i => { dataOut[new Date(i.date).getMonth()] += i.amount; });
+      intIncomes.forEach(i => { dataIn[new Date(i.date).getMonth()]  += i.amount; });
+      intExpenses.forEach(i => { dataOut[new Date(i.date).getMonth()] += i.amount; });
+      chartTitle = `Pendapatan per Bulan — ${range.year}`;
+    } else if (period === 'month') {
+      // Daily breakdown for the selected month
+      const daysInMonth = new Date(range.end.getFullYear(), range.end.getMonth() + 1, 0).getDate();
+      labels = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+      dataIn  = Array(daysInMonth).fill(0);
+      dataOut = Array(daysInMonth).fill(0);
+      incomes.forEach(i => { const d = new Date(i.date).getDate() - 1; dataIn[d]  += i.amount; });
+      expenses.forEach(i => { const d = new Date(i.date).getDate() - 1; dataOut[d] += i.amount; });
+      intIncomes.forEach(i => { const d = new Date(i.date).getDate() - 1; dataIn[d]  += i.amount; });
+      intExpenses.forEach(i => { const d = new Date(i.date).getDate() - 1; dataOut[d] += i.amount; });
+      chartTitle = `Arus Kas Harian — ${range.label}`;
+      chartType = 'bar';
+    } else {
+      // Monthly breakdown for 3 or 6 month range
+      const months = period === '3month' ? 3 : 6;
+      for (let i = months - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        labels.push(monthNames[d.getMonth()]);
+        const mIn  = [...incomes, ...intIncomes].filter(t => {
+          const td = new Date(t.date);
+          return td.getMonth() === d.getMonth() && td.getFullYear() === d.getFullYear();
+        }).reduce((s, t) => s + t.amount, 0);
+        const mOut = [...expenses, ...intExpenses].filter(t => {
+          const td = new Date(t.date);
+          return td.getMonth() === d.getMonth() && td.getFullYear() === d.getFullYear();
+        }).reduce((s, t) => s + t.amount, 0);
+        dataIn.push(mIn);
+        dataOut.push(mOut);
+      }
+      chartTitle = `Arus Kas ${months} Bulan Terakhir`;
+    }
+
+    const chartTitleEl = document.getElementById('reportChartTitle');
+    if (chartTitleEl) chartTitleEl.textContent = chartTitle;
 
     if (reportChartInstance) reportChartInstance.destroy();
     const ctx = document.getElementById('reportChart').getContext('2d');
     reportChartInstance = new Chart(ctx, {
-      type: 'line',
+      type: chartType,
       data: {
         labels,
         datasets: [
-          { label: 'Pendapatan', data: dataIn, borderColor: 'var(--green)', backgroundColor: 'rgba(62,207,142,0.1)', tension: 0.4, fill: true, pointRadius: 4 },
-          { label: 'Pengeluaran', data: dataOut, borderColor: 'var(--red)', backgroundColor: 'rgba(245,101,101,0.08)', tension: 0.4, fill: true, pointRadius: 4 }
+          { label: 'Pemasukan', data: dataIn,  borderColor: 'var(--green)', backgroundColor: 'rgba(62,207,142,0.15)', tension: 0.4, fill: true, pointRadius: chartType === 'line' ? 4 : 0, borderRadius: chartType === 'bar' ? 5 : 0, borderSkipped: false },
+          { label: 'Pengeluaran', data: dataOut, borderColor: 'var(--red)',   backgroundColor: 'rgba(245,101,101,0.12)', tension: 0.4, fill: true, pointRadius: chartType === 'line' ? 4 : 0, borderRadius: chartType === 'bar' ? 5 : 0, borderSkipped: false }
         ]
       },
       options: {
@@ -918,28 +1056,78 @@ async function renderReports() {
       }
     });
 
+    // ---- RINGKASAN PER PROPERTI ----
     const table = document.getElementById('reportPropertyTable');
     if (props.length === 0) {
       table.innerHTML = '<div class="empty-state"><div class="empty-state-title">Belum ada properti</div></div>';
-      return;
-    }
-    table.innerHTML = '<div class="report-prop-table">' + props.map(p => {
-      const pIn = incomes.filter(i => i.propertyId._id === p._id).reduce((s, i) => s + i.amount, 0);
-      const pOut = expenses.filter(i => i.propertyId._id === p._id).reduce((s, i) => s + i.amount, 0);
-      return `
-        <div class="report-prop-row">
-          <div>
-            <div class="report-prop-name">${p.name}</div>
-            <small style="color:var(--text3)">${p.type}</small>
+    } else {
+      table.innerHTML = '<div class="report-prop-table">' + props.map(p => {
+        const pIn  = incomes.filter(i => i.propertyId._id === p._id).reduce((s, i) => s + i.amount, 0);
+        const pOut = expenses.filter(i => i.propertyId._id === p._id).reduce((s, i) => s + i.amount, 0);
+        return `
+          <div class="report-prop-row">
+            <div>
+              <div class="report-prop-name">${p.name}</div>
+              <small style="color:var(--text3)">${p.type}</small>
+            </div>
+            <div class="report-prop-vals">
+              <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">MASUK</div><div class="report-prop-in">${fmt(pIn)}</div></div>
+              <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">KELUAR</div><div class="report-prop-out">${fmt(pOut)}</div></div>
+              <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">BERSIH</div><div style="font-weight:600;color:${pIn-pOut>=0?'var(--green)':'var(--red)'}">${fmt(pIn-pOut)}</div></div>
+            </div>
           </div>
-          <div class="report-prop-vals">
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">MASUK</div><div class="report-prop-in">${fmt(pIn)}</div></div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">KELUAR</div><div class="report-prop-out">${fmt(pOut)}</div></div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">BERSIH</div><div style="font-weight:600;color:${pIn-pOut>=0?'var(--green)':'var(--red)'}">${fmt(pIn-pOut)}</div></div>
+        `;
+      }).join('') + '</div>';
+    }
+
+    // ---- RINGKASAN KAS ----
+    const kasTable = document.getElementById('reportKasTable');
+    const kasRows = [
+      { label: 'Pendapatan Sewa', amount: totalPropIn, type: 'in', icon: '🏠' },
+      { label: 'Kas Masuk (Non-Sewa)', amount: totalKasIn, type: 'in', icon: '💰' },
+      { label: 'Pengeluaran Properti', amount: totalPropOut, type: 'out', icon: '🔧' },
+      { label: 'Kas Keluar (Non-Properti)', amount: totalKasOut, type: 'out', icon: '🛒' },
+    ];
+    kasTable.innerHTML = '<div class="report-prop-table">' + kasRows.map(r => `
+      <div class="report-prop-row">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.3rem;">${r.icon}</span>
+          <div>
+            <div class="report-prop-name" style="font-size:0.9rem;">${r.label}</div>
+            <small style="color:var(--text3)">${r.type === 'in' ? 'Pemasukan' : 'Pengeluaran'}</small>
           </div>
         </div>
-      `;
-    }).join('') + '</div>';
+        <div class="report-prop-vals">
+          <div><div class="${r.type === 'in' ? 'report-prop-in' : 'report-prop-out'}" style="font-size:1rem;">${r.type === 'in' ? '+' : '-'}${fmt(r.amount)}</div></div>
+        </div>
+      </div>
+    `).join('') + '</div>';
+
+    // ---- SALDO KAS BERSIH ----
+    const kasSummaryEl = document.getElementById('reportKasSummary');
+    const saldoBersih  = totalIn - totalOut;
+    const saldoColor   = saldoBersih >= 0 ? 'var(--green)' : 'var(--red)';
+    const roiPct       = totalOut > 0 ? ((saldoBersih / totalOut) * 100).toFixed(1) : '—';
+    kasSummaryEl.innerHTML = `
+      <div style="padding:16px 4px;">
+        <div class="report-prop-row" style="border-bottom:1px solid var(--border,#252a38);padding-bottom:12px;margin-bottom:12px;">
+          <div><div class="report-prop-name">Total Pemasukan</div></div>
+          <div class="report-prop-in" style="font-size:1rem;font-weight:600;">+${fmt(totalIn)}</div>
+        </div>
+        <div class="report-prop-row" style="border-bottom:1px solid var(--border,#252a38);padding-bottom:12px;margin-bottom:12px;">
+          <div><div class="report-prop-name">Total Pengeluaran</div></div>
+          <div class="report-prop-out" style="font-size:1rem;font-weight:600;">-${fmt(totalOut)}</div>
+        </div>
+        <div class="report-prop-row" style="border-bottom:1px solid var(--border,#252a38);padding-bottom:12px;margin-bottom:12px;">
+          <div><div class="report-prop-name">Keuntungan Bersih</div><small style="color:var(--text3)">Pemasukan − Pengeluaran</small></div>
+          <div style="font-size:1.15rem;font-weight:700;color:${saldoColor};">${saldoBersih >= 0 ? '+' : ''}${fmt(saldoBersih)}</div>
+        </div>
+        <div class="report-prop-row">
+          <div><div class="report-prop-name">Return on Cost</div><small style="color:var(--text3)">Bersih ÷ Pengeluaran × 100%</small></div>
+          <div style="font-size:1rem;font-weight:600;color:${saldoColor};">${roiPct}${roiPct !== '—' ? '%' : ''}</div>
+        </div>
+      </div>
+    `;
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
   }
@@ -1430,7 +1618,10 @@ function initApp() {
       });
     });
 
-    document.getElementById('reportYear').addEventListener('change', renderReports);
+    const repYear = document.getElementById('reportYear');
+    if (repYear) repYear.addEventListener('change', renderReports);
+    const repMonth = document.getElementById('reportMonth');
+    if (repMonth) repMonth.addEventListener('change', renderReports);
   }
 
   populatePropertySelects();
