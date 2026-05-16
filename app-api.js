@@ -1903,7 +1903,134 @@ async function deleteCicilanPayment(cicilanId, paymentId) {
   }
 }
 
-// ========== INIT ==========
+// ========== BAYAR SERENTAK ==========
+let _bayarSerentakList = []; // cicilan yang lolos filter tanggal
+
+function openBayarSerentak() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('bayarSerentakFilterDate').value = today;
+  document.getElementById('bayarSerentakDate').value = today;
+  document.getElementById('bayarSerentakNote').value = '';
+  document.getElementById('bayarSerentakTotal').style.display = 'none';
+  document.getElementById('btnBayarSerentakSubmit').disabled = true;
+  document.getElementById('bayarSerentakPreview').innerHTML =
+    `<div style="color:var(--text3);font-size:0.85rem;text-align:center;padding:12px 0;">Memuat cicilan…</div>`;
+  _bayarSerentakList = [];
+  openModal('modalBayarSerentak');
+
+  previewBayarSerentak();
+
+  document.getElementById('bayarSerentakFilterDate').onchange = previewBayarSerentak;
+  document.getElementById('bayarSerentakDate').onchange = () => {
+    // tanggal bayar berubah tidak perlu re-fetch, cukup enable/disable tombol
+    const filterDate = document.getElementById('bayarSerentakFilterDate').value;
+    const payDate    = document.getElementById('bayarSerentakDate').value;
+    document.getElementById('btnBayarSerentakSubmit').disabled = !filterDate || !payDate || _bayarSerentakList.length === 0;
+  };
+}
+
+async function previewBayarSerentak() {
+  try {
+    const filterDate = document.getElementById('bayarSerentakFilterDate').value;
+    const payDate    = document.getElementById('bayarSerentakDate').value;
+    const preview    = document.getElementById('bayarSerentakPreview');
+    const totalBox   = document.getElementById('bayarSerentakTotal');
+    const btnSubmit  = document.getElementById('btnBayarSerentakSubmit');
+
+    if (!filterDate) {
+      preview.innerHTML = `<div style="color:var(--text3);font-size:0.85rem;text-align:center;padding:12px 0;">Pilih tanggal cicilan untuk melihat preview</div>`;
+      totalBox.style.display = 'none';
+      btnSubmit.disabled = true;
+      _bayarSerentakList = [];
+      return;
+    }
+
+    // Parse tanggal filter: hanya cocokkan hari, bulan, tahun persis
+    const fd = new Date(filterDate);
+    const fd_day   = fd.getUTCDate();
+    const fd_month = fd.getUTCMonth();
+    const fd_year  = fd.getUTCFullYear();
+
+    const all = await API.get('/cicilan');
+
+    // Filter: tanggal cicilan persis sama DAN belum lunas
+    const cocok = all.filter(c => {
+      const cd = new Date(c.date);
+      const sameTgl = cd.getUTCDate()  === fd_day &&
+                      cd.getUTCMonth() === fd_month &&
+                      cd.getUTCFullYear() === fd_year;
+      const totalPaid = (c.payments || []).reduce((s, p) => s + p.amount, 0);
+      const belumLunas = totalPaid < c.totalAmount;
+      return sameTgl && belumLunas;
+    });
+
+    _bayarSerentakList = cocok;
+
+    if (cocok.length === 0) {
+      preview.innerHTML = `<div style="color:var(--text3);font-size:0.85rem;text-align:center;padding:16px 0;">Tidak ada cicilan aktif pada tanggal ini</div>`;
+      totalBox.style.display = 'none';
+      btnSubmit.disabled = true;
+      return;
+    }
+
+    const totalAmt = cocok.reduce((s, c) => s + c.bulanan, 0);
+
+    preview.innerHTML = cocok.map(c => {
+      const totalPaid = (c.payments || []).reduce((s, p) => s + p.amount, 0);
+      const sisaBayar = Math.max(0, c.totalAmount - totalPaid);
+      const sisaBulan = Math.ceil(sisaBayar / c.bulanan);
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-size:0.88rem;font-weight:500;">${c.name}</div>
+            <div style="font-size:0.75rem;color:var(--text2);">${c.category || '—'} · sisa ${sisaBulan} bulan</div>
+          </div>
+          <span style="color:var(--red);font-weight:600;font-size:0.9rem;">-${fmt(c.bulanan)}</span>
+        </div>
+      `;
+    }).join('');
+
+    document.getElementById('bayarSerentakCount').textContent = `${cocok.length} cicilan akan dibayar`;
+    document.getElementById('bayarSerentakTotalAmt').textContent = fmt(totalAmt);
+    totalBox.style.display = 'block';
+    btnSubmit.disabled = !payDate;
+
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function submitBayarSerentak() {
+  const payDate = document.getElementById('bayarSerentakDate').value;
+  const note    = document.getElementById('bayarSerentakNote').value.trim();
+  if (!payDate) { showToast('Pilih tanggal bayar', 'error'); return; }
+  if (_bayarSerentakList.length === 0) { showToast('Tidak ada cicilan yang cocok', 'error'); return; }
+
+  const btn = document.getElementById('btnBayarSerentakSubmit');
+  btn.disabled = true;
+  btn.textContent = 'Memproses…';
+
+  try {
+    await Promise.all(_bayarSerentakList.map(c =>
+      API.post(`/cicilan/${c._id}/payments`, {
+        date:   payDate,
+        amount: c.bulanan,
+        note:   note || 'Bayar serentak',
+      })
+    ));
+
+    showToast(`✓ ${_bayarSerentakList.length} cicilan berhasil dibayar`);
+    closeModal('modalBayarSerentak');
+    renderCicilan();
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Bayar Semua';
+  }
+}
+
+
 function initApp() {
   const today = new Date().toISOString().split('T')[0];
 
