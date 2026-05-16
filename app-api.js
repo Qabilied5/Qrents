@@ -303,12 +303,148 @@ async function renderDashboard() {
         </tr>
       `).join('');
     }
+    // Render mini calendar
+    await buildDashCalEvents();
+    renderDashCal();
+
   } catch (error) {
     showToast('Error: ' + error.message, 'error');
   }
 }
 
-// ========== PROPERTIES ==========
+// ========== DASHBOARD MINI CALENDAR ==========
+let _dashCalYear  = new Date().getFullYear();
+let _dashCalMonth = new Date().getMonth();
+let _dashCalEvents = {}; // { 'YYYY-MM-DD': [{type, label}] }
+
+async function buildDashCalEvents() {
+  try {
+    const safeGet = async (path) => { try { return await API.get(path); } catch(e) { return []; } };
+    const [tenants, cicilans, incomes] = await Promise.all([
+      safeGet('/tenants'),
+      safeGet('/cicilan'),
+      safeGet('/income'),
+    ]);
+
+    const events = {};
+    const addEvent = (dateStr, type, label) => {
+      const key = dateStr ? dateStr.split('T')[0] : null;
+      if (!key) return;
+      if (!events[key]) events[key] = [];
+      events[key].push({ type, label });
+    };
+
+    // Tenant end dates
+    tenants.forEach(t => {
+      if (t.end) addEvent(t.end, 'tenant', `Kontrak: ${t.name}`);
+    });
+
+    // Cicilan due dates — tanggal hari-nya tiap bulan di tahun/bulan kalender
+    (cicilans || []).forEach(c => {
+      const paid = (c.payments || []).reduce((s, p) => s + p.amount, 0);
+      if (paid >= (c.totalAmount || 0)) return; // lunas
+      const dueDay = new Date(c.date).getDate();
+      // Tampilkan untuk 3 bulan ke depan dari sekarang
+      const now = new Date();
+      for (let offset = -1; offset <= 3; offset++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + offset, dueDay);
+        const key = d.toISOString().split('T')[0];
+        addEvent(key, 'cicilan', `Cicilan: ${c.name}`);
+      }
+    });
+
+    // Income payment dates (mark paid days)
+    incomes.forEach(i => {
+      if (i.date) addEvent(i.date, 'income', `Bayar: ${i.tenantId?.name || i.note || ''}`);
+    });
+
+    _dashCalEvents = events;
+  } catch(e) {
+    _dashCalEvents = {};
+  }
+}
+
+function renderDashCal() {
+  const label = document.getElementById('dashCalLabel');
+  const grid  = document.getElementById('dashCalendar');
+  if (!label || !grid) return;
+
+  const monthStr = new Date(_dashCalYear, _dashCalMonth, 1)
+    .toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  label.textContent = monthStr;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Build grid
+  const firstDay = new Date(_dashCalYear, _dashCalMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(_dashCalYear, _dashCalMonth + 1, 0).getDate();
+
+  const dayNames = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+  let html = '<div class="dash-cal-grid">';
+
+  // Day headers
+  dayNames.forEach(d => {
+    html += `<div class="dash-cal-dayname">${d}</div>`;
+  });
+
+  // Empty cells before first day
+  for (let i = 0; i < firstDay; i++) {
+    html += `<div class="dash-cal-cell dash-cal-empty"></div>`;
+  }
+
+  // Day cells
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateKey = `${_dashCalYear}-${String(_dashCalMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const cellDate = new Date(_dashCalYear, _dashCalMonth, d);
+    const isToday = cellDate.getTime() === today.getTime();
+    const events = _dashCalEvents[dateKey] || [];
+
+    const hasTenant  = events.some(e => e.type === 'tenant');
+    const hasCicilan = events.some(e => e.type === 'cicilan');
+    const hasIncome  = events.some(e => e.type === 'income');
+
+    const dotHtml = (hasTenant || hasCicilan || hasIncome) ? `
+      <div class="dash-cal-dots">
+        ${hasIncome  ? '<span class="dash-cal-dot dot-income"></span>'  : ''}
+        ${hasTenant  ? '<span class="dash-cal-dot dot-tenant"></span>'  : ''}
+        ${hasCicilan ? '<span class="dash-cal-dot dot-cicilan"></span>' : ''}
+      </div>` : '';
+
+    const tooltipLines = events.map(e => e.label).join('&#10;');
+    const titleAttr = events.length ? `title="${tooltipLines}"` : '';
+
+    html += `<div class="dash-cal-cell${isToday ? ' dash-cal-today' : ''}${events.length ? ' dash-cal-has-event' : ''}" ${titleAttr}>
+      <span class="dash-cal-day">${d}</span>
+      ${dotHtml}
+    </div>`;
+  }
+
+  html += '</div>';
+
+  // Legend
+  html += `<div class="dash-cal-legend">
+    <span><span class="dash-cal-dot dot-income"></span> Bayar</span>
+    <span><span class="dash-cal-dot dot-tenant"></span> Kontrak</span>
+    <span><span class="dash-cal-dot dot-cicilan"></span> Cicilan</span>
+  </div>`;
+
+  grid.innerHTML = html;
+}
+
+function dashCalPrev() {
+  _dashCalMonth--;
+  if (_dashCalMonth < 0) { _dashCalMonth = 11; _dashCalYear--; }
+  renderDashCal();
+}
+
+function dashCalNext() {
+  _dashCalMonth++;
+  if (_dashCalMonth > 11) { _dashCalMonth = 0; _dashCalYear++; }
+  renderDashCal();
+}
+
+
 async function renderProperties() {
   try {
     await populatePropertySelects();
@@ -2162,6 +2298,10 @@ async function renderReminders() {
   const list = document.getElementById('reminderList');
   const summary = document.getElementById('reminderSummary');
   if (!list) return;
+
+  // Hapus cache lama agar selalu ambil data terbaru dari server
+  window._lastReminders = null;
+
   list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-title">Memuat pengingat...</div></div>';
 
   try {
@@ -2215,16 +2355,27 @@ async function renderReminders() {
 
     // ── Cicilan reminders ──
     (cicilans || []).forEach(c => {
-      if (c.status === 'lunas') return;
+      // Hitung sisa bayar langsung dari data fresh (tidak bergantung pada field status)
       const payments = c.payments || [];
       const paid = payments.reduce((s, p) => s + p.amount, 0);
-      const remaining = (c.totalAmount || 0) - paid;
-      if (remaining <= 0) return;
+      const remaining = Math.max(0, (c.totalAmount || 0) - paid);
+      if (remaining <= 0) return; // sudah lunas
 
-      // Find next due: cicilan start date each month
-      const start = new Date(c.date);
-      let nextDue = new Date(now.getFullYear(), now.getMonth(), start.getDate());
-      if (nextDue < now) nextDue.setMonth(nextDue.getMonth() + 1);
+      // Ambil tanggal jatuh tempo bulanan dari c.date (tanggal mulai cicilan)
+      // nextDue = tanggal yang sama bulan ini atau bulan depan
+      const startDate = new Date(c.date);
+      startDate.setHours(0, 0, 0, 0);
+      const dueDay = startDate.getDate(); // hari jatuh tempo tiap bulan
+
+      // Cari nextDue: bulan ini dulu, kalau sudah lewat pakai bulan depan
+      let nextDue = new Date(now.getFullYear(), now.getMonth(), dueDay);
+      nextDue.setHours(0, 0, 0, 0);
+      if (nextDue < now) {
+        // Bulan ini sudah lewat, cek bulan depan
+        nextDue = new Date(now.getFullYear(), now.getMonth() + 1, dueDay);
+        nextDue.setHours(0, 0, 0, 0);
+      }
+
       const daysLeft = Math.ceil((nextDue - now) / (1000 * 60 * 60 * 24));
 
       let urgency = null;
@@ -2240,6 +2391,9 @@ async function renderReminders() {
           ? 'Jatuh tempo hari ini!'
           : `Jatuh tempo ${daysLeft} hari lagi`;
 
+      // Gunakan c.bulanan (field yang benar dari API, bukan monthlyAmount)
+      const bulanan = c.bulanan || Math.round((c.totalAmount || 0) / (c.totalBulan || 1));
+
       reminders.push({
         id: `cicilan-${c._id}`,
         type: 'cicilan',
@@ -2249,7 +2403,7 @@ async function renderReminders() {
         label,
         daysLeft,
         date: nextDue.toISOString().split('T')[0],
-        meta: `Cicilan: ${fmt(c.monthlyAmount || 0)}/bln · Sisa: ${fmt(remaining)}`,
+        meta: `Cicilan: ${fmt(bulanan)}/bln · Sisa: ${fmt(remaining)}`,
         action: () => navigateTo('cicilan'),
         actionLabel: '→ Lihat Cicilan',
       });

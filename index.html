@@ -287,6 +287,18 @@
 
       <div class="card">
         <div class="card-header">
+          <h3>Kalender</h3>
+          <div class="dash-cal-nav">
+            <button class="dash-cal-btn" onclick="dashCalPrev()">‹</button>
+            <span class="dash-cal-month-label" id="dashCalLabel"></span>
+            <button class="dash-cal-btn" onclick="dashCalNext()">›</button>
+          </div>
+        </div>
+        <div class="dash-calendar" id="dashCalendar"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
           <h3>Status Properti</h3>
         </div>
         <div id="propertyStatusList" class="property-status-list"></div>
