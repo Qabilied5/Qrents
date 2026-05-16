@@ -22,6 +22,7 @@ app.use('/api/expenses',           require('./routes/expenses'));
 app.use('/api/internal-incomes',   require('./routes/internalIncomes'));
 app.use('/api/internal-expenses',  require('./routes/internalExpenses'));
 app.use('/api/cicilan',            require('./routes/cicilan'));   // ← Cicilan & pembayaran
+app.use('/api/chat',               require('./routes/chat'));       // ← AI Chatbot
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK' });

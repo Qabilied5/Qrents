@@ -50,6 +50,7 @@ function navigateTo(pageId) {
   }
   if (pageId === 'reports') renderReports();
   if (pageId === 'cicilan') { populateCicilanFilters(); renderCicilan(); }
+  if (pageId === 'ai-chat') initAiChat();
 
   // Close sidebar on mobile
   if (window.innerWidth <= 768) {
@@ -2119,3 +2120,187 @@ document.addEventListener('DOMContentLoaded', () => {
     openLoginScreen && openLoginScreen();
   }
 });
+
+// ========== AI CHAT ==========
+let aiChatHistory = []; // [{role:'user'|'assistant', content:'...'}]
+let aiChatInitialized = false;
+
+function initAiChat() {
+  // Scroll to bottom when page is opened
+  const box = document.getElementById('aiChatBox');
+  if (box) setTimeout(() => { box.scrollTop = box.scrollHeight; }, 100);
+}
+
+async function buildAiContext() {
+  try {
+    const now = new Date();
+    const since30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+
+    const [properties, tenants, allIncome, allExpenses, allIntIncomes, allIntExpenses] = await Promise.all([
+      API.get('/properties'),
+      API.get('/tenants'),
+      API.get('/income'),
+      API.get('/expenses'),
+      API.get('/internal-incomes'),
+      API.get('/internal-expenses'),
+    ]);
+
+    const curMonth = now.getMonth();
+    const curYear  = now.getFullYear();
+    const inThisMonth = (dateStr) => {
+      const d = new Date(dateStr);
+      return d.getMonth() === curMonth && d.getFullYear() === curYear;
+    };
+    const inLast30 = (dateStr) => new Date(dateStr) >= since30;
+
+    const totalIncomeMonth  = allIncome.filter(i => inThisMonth(i.date)).reduce((s, i) => s + i.amount, 0)
+                            + allIntIncomes.filter(i => inThisMonth(i.date)).reduce((s, i) => s + i.amount, 0);
+    const totalExpenseMonth = allExpenses.filter(i => inThisMonth(i.date)).reduce((s, i) => s + i.amount, 0)
+                            + allIntExpenses.filter(i => inThisMonth(i.date)).reduce((s, i) => s + i.amount, 0);
+
+    return {
+      properties,
+      tenants,
+      recentIncome:      allIncome.filter(i => inLast30(i.date)),
+      recentExpenses:    allExpenses.filter(i => inLast30(i.date)),
+      recentIntIncomes:  allIntIncomes.filter(i => inLast30(i.date)),
+      recentIntExpenses: allIntExpenses.filter(i => inLast30(i.date)),
+      summary: {
+        totalIncomeMonth,
+        totalExpenseMonth,
+        profitMonth:  totalIncomeMonth - totalExpenseMonth,
+        occupied:     properties.filter(p => p.status === 'terisi').length,
+        totalProps:   properties.length,
+      }
+    };
+  } catch (e) {
+    console.error('buildAiContext error:', e);
+    return {};
+  }
+}
+
+function appendAiMessage(role, text) {
+  const box = document.getElementById('aiChatBox');
+  if (!box) return;
+
+  const isBot   = role === 'assistant';
+  const wrapper = document.createElement('div');
+  wrapper.className = `ai-msg ${isBot ? 'ai-msg-bot' : 'ai-msg-user'}`;
+
+  // Simple markdown: **bold**, newlines
+  const formatted = text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+
+  wrapper.innerHTML = isBot
+    ? `<div class="ai-msg-avatar">🤖</div><div class="ai-msg-bubble">${formatted}</div>`
+    : `<div class="ai-msg-bubble">${formatted}</div>`;
+
+  box.appendChild(wrapper);
+  box.scrollTop = box.scrollHeight;
+
+  // Hide suggestion chips after first user message
+  if (role === 'user') {
+    const chips = document.getElementById('aiSuggestions');
+    if (chips) chips.style.display = 'none';
+  }
+}
+
+function showAiTyping() {
+  const box = document.getElementById('aiChatBox');
+  if (!box) return;
+  const el = document.createElement('div');
+  el.className = 'ai-msg ai-msg-bot';
+  el.id = 'aiTypingIndicator';
+  el.innerHTML = `<div class="ai-msg-avatar">🤖</div><div class="ai-msg-bubble ai-typing"><span></span><span></span><span></span></div>`;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
+function removeAiTyping() {
+  const el = document.getElementById('aiTypingIndicator');
+  if (el) el.remove();
+}
+
+async function sendAiMessage() {
+  const input   = document.getElementById('aiInput');
+  const sendBtn = document.getElementById('aiSendBtn');
+  const text    = input?.value.trim();
+  if (!text) return;
+
+  // Disable input while processing
+  input.value = '';
+  input.style.height = 'auto';
+  input.disabled = true;
+  sendBtn.disabled = true;
+
+  // Show user message
+  appendAiMessage('user', text);
+  aiChatHistory.push({ role: 'user', content: text });
+
+  // Show typing indicator
+  showAiTyping();
+
+  try {
+    const context = await buildAiContext();
+
+    const res = await fetch(`${API_URL}/chat`, {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify({
+        messages: aiChatHistory,
+        context,
+      }),
+    });
+
+    removeAiTyping();
+
+    if (!res.ok) {
+      const err = await res.json();
+      appendAiMessage('assistant', `⚠️ ${err.message || 'Terjadi kesalahan. Coba lagi.'}`);
+    } else {
+      const data = await res.json();
+      appendAiMessage('assistant', data.reply);
+      aiChatHistory.push({ role: 'assistant', content: data.reply });
+    }
+  } catch (err) {
+    removeAiTyping();
+    appendAiMessage('assistant', '⚠️ Tidak dapat terhubung ke server. Periksa koneksi Anda.');
+  } finally {
+    input.disabled = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+function sendAiSuggestion(btn) {
+  const input = document.getElementById('aiInput');
+  if (!input) return;
+  input.value = btn.textContent;
+  sendAiMessage();
+}
+
+function onAiInputKeydown(e) {
+  // Enter kirim, Shift+Enter baris baru
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendAiMessage();
+  }
+}
+
+function autoResizeAiInput(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function clearAiChat() {
+  aiChatHistory = [];
+  const box = document.getElementById('aiChatBox');
+  if (box) box.innerHTML = `
+    <div class="ai-msg ai-msg-bot">
+      <div class="ai-msg-avatar">🤖</div>
+      <div class="ai-msg-bubble">Halo! Saya asisten keuangan Anda. Tanya apa saja seputar properti, penyewa, pendapatan, atau pengeluaran Anda. 😊</div>
+    </div>`;
+  const chips = document.getElementById('aiSuggestions');
+  if (chips) chips.style.display = '';
+}

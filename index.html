@@ -119,6 +119,9 @@
     <a href="#" class="nav-item" data-page="reports">
       <span class="nav-icon">📊</span><span>Laporan</span>
     </a>
+    <a href="#" class="nav-item" data-page="ai-chat">
+      <span class="nav-icon">🤖</span><span>AI Chat</span>
+    </a>
   </nav>
 
   <div class="sidebar-footer">
@@ -626,6 +629,51 @@
           <tbody id="cicilanTable"></tbody>
         </table>
       </div>
+    </div>
+  </section>
+
+  <!-- ===== AI CHAT PAGE ===== -->
+  <section class="page" id="page-ai-chat">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">AI Chat</h1>
+        <p class="page-subtitle">Tanya apa saja tentang keuangan & properti Anda</p>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="clearAiChat()">🗑 Hapus Riwayat</button>
+    </div>
+
+    <!-- Suggestion chips -->
+    <div class="ai-suggestions" id="aiSuggestions">
+      <button class="ai-chip" onclick="sendAiSuggestion(this)">Properti mana yang paling untung?</button>
+      <button class="ai-chip" onclick="sendAiSuggestion(this)">Berapa total pendapatan bulan ini?</button>
+      <button class="ai-chip" onclick="sendAiSuggestion(this)">Penyewa mana yang kontraknya mau habis?</button>
+      <button class="ai-chip" onclick="sendAiSuggestion(this)">Ringkasan keuangan bulan ini</button>
+      <button class="ai-chip" onclick="sendAiSuggestion(this)">Pengeluaran terbesar bulan ini apa?</button>
+    </div>
+
+    <!-- Chat messages -->
+    <div class="ai-chat-box" id="aiChatBox">
+      <div class="ai-msg ai-msg-bot">
+        <div class="ai-msg-avatar">🤖</div>
+        <div class="ai-msg-bubble">
+          Halo! Saya asisten keuangan Anda. Tanya apa saja seputar properti, penyewa, pendapatan, atau pengeluaran Anda. 😊
+        </div>
+      </div>
+    </div>
+
+    <!-- Input area -->
+    <div class="ai-input-bar">
+      <textarea
+        id="aiInput"
+        class="ai-input"
+        placeholder="Tulis pertanyaan Anda..."
+        rows="1"
+        onkeydown="onAiInputKeydown(event)"
+        oninput="autoResizeAiInput(this)"
+      ></textarea>
+      <button class="ai-send-btn" id="aiSendBtn" onclick="sendAiMessage()">
+        <span id="aiSendIcon">➤</span>
+      </button>
     </div>
   </section>
 </main>
@@ -1150,6 +1198,10 @@
   <div class="bottom-nav-item" data-page="reports" onclick="navigateTo('reports'); setActiveBottomNav(this)">
     <span class="bnav-icon">📊</span>
     <span class="bnav-label">Laporan</span>
+  </div>
+  <div class="bottom-nav-item" data-page="ai-chat" onclick="navigateTo('ai-chat'); setActiveBottomNav(this)">
+    <span class="bnav-icon">🤖</span>
+    <span class="bnav-label">AI Chat</span>
   </div>
 </nav>
 
