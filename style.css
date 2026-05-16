@@ -2195,3 +2195,23 @@ body.light-mode .theme-toggle-switch::after {
   .reminder-tabs { gap: 0; }
   .reminder-tab { padding: 8px 12px; font-size: 12px; }
 }
+
+/* ===== FAB REMINDER BADGE ===== */
+.fab-reminder-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  background: var(--red);
+  color: #fff;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 2px solid var(--bg2);
+  pointer-events: none;
+}

@@ -2265,12 +2265,12 @@ async function renderReminders() {
 
     window._lastReminders = reminders;
 
-    // Update badge
+    // Update badge on FAB button
     const dismissed = getDismissedReminders();
     const activeCount = reminders.filter(r => !dismissed.includes(r.id)).length;
-    const badge = document.getElementById('bnav-reminder-badge');
+    const badge = document.getElementById('fabReminderBadge');
     if (badge) {
-      badge.textContent = activeCount;
+      badge.textContent = activeCount > 9 ? '9+' : activeCount;
       badge.style.display = activeCount > 0 ? 'flex' : 'none';
     }
 

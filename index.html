@@ -1167,17 +1167,16 @@
     <span class="bnav-label">Properti</span>
   </div>
   <div class="bottom-nav-fab-wrapper" id="fabWrapper">
-    <div class="bottom-nav-fab" id="fabBtn" onclick="showFabMenu()">＋</div>
+    <div class="bottom-nav-fab" id="fabBtn" onclick="showFabMenu()" style="position:relative;">＋<span class="fab-reminder-badge" id="fabReminderBadge" style="display:none"></span></div>
     <span class="bottom-nav-fab-label">Catat</span>
   </div>
   <div class="bottom-nav-item" data-page="tenants" onclick="navigateTo('tenants'); setActiveBottomNav(this)">
     <span class="bnav-icon">👤</span>
     <span class="bnav-label">Penyewa</span>
   </div>
-  <div class="bottom-nav-item" data-page="reminders" onclick="navigateTo('reminders'); setActiveBottomNav(this)" id="bottomNavReminders">
-    <span class="bnav-icon">🔔</span>
-    <span class="bnav-label">Pengingat</span>
-    <span class="bnav-badge" id="bnav-reminder-badge" style="display:none">0</span>
+  <div class="bottom-nav-item" data-page="reports" onclick="navigateTo('reports'); setActiveBottomNav(this)">
+    <span class="bnav-icon">📊</span>
+    <span class="bnav-label">Laporan</span>
   </div>
 </nav>
 
