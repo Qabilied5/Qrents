@@ -2136,13 +2136,15 @@ async function buildAiContext() {
     const now = new Date();
     const since30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
 
+    // Fetch semua dengan fallback [] supaya satu gagal tidak crash semua
+    const safeGet = async (path) => { try { return await API.get(path); } catch(e) { return []; } };
     const [properties, tenants, allIncome, allExpenses, allIntIncomes, allIntExpenses] = await Promise.all([
-      API.get('/properties'),
-      API.get('/tenants'),
-      API.get('/income'),
-      API.get('/expenses'),
-      API.get('/internal-incomes'),
-      API.get('/internal-expenses'),
+      safeGet('/properties'),
+      safeGet('/tenants'),
+      safeGet('/income'),
+      safeGet('/expenses'),
+      safeGet('/internal-incomes'),
+      safeGet('/internal-expenses'),
     ]);
 
     const curMonth = now.getMonth();
