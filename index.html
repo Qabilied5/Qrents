@@ -1199,10 +1199,6 @@
     <span class="bnav-icon">📊</span>
     <span class="bnav-label">Laporan</span>
   </div>
-  <div class="bottom-nav-item" data-page="ai-chat" onclick="navigateTo('ai-chat'); setActiveBottomNav(this)">
-    <span class="bnav-icon">🤖</span>
-    <span class="bnav-label">AI Chat</span>
-  </div>
 </nav>
 
 <!-- FAB Quick Menu (mobile) -->
@@ -1249,6 +1245,13 @@
     <div>
       <div class="fab-menu-label">Properti Baru</div>
       <div class="fab-menu-sub">Tambah unit properti</div>
+    </div>
+  </button>
+  <button class="fab-menu-item" onclick="hideFabMenu(); navigateTo('ai-chat')">
+    <span class="fab-menu-icon accent-gold-icon">🤖</span>
+    <div>
+      <div class="fab-menu-label">AI Chat</div>
+      <div class="fab-menu-sub">Tanya asisten keuangan</div>
     </div>
   </button>
 </div>
