@@ -1777,9 +1777,12 @@ body.light-mode .theme-toggle-switch::after {
 /* ===== END LIGHT MODE ===== */
 /* ===== AI CHAT ===== */
 #page-ai-chat {
-  display: flex;
+  display: none;
   flex-direction: column;
   height: calc(100vh - 60px);
+}
+#page-ai-chat.active {
+  display: flex;
 }
 
 .ai-suggestions {
