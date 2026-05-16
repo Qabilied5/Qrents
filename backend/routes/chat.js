@@ -80,7 +80,7 @@ Jawab berdasarkan data di atas. Jika data tidak tersedia, katakan "belum ada dat
     }));
     const lastMessage = messages[messages.length - 1];
 
-    const GEMINI_MODEL = 'gemini-2.0-flash';
+    const GEMINI_MODEL = 'gemini-2.0-flash-001';
     const GEMINI_URL   = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
     const requestBody = {
@@ -111,7 +111,7 @@ Jawab berdasarkan data di atas. Jika data tidak tersedia, katakan "belum ada dat
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('Gemini API error:', errText);
+      console.error('Gemini API error:', response.status, errText);
       return res.status(502).json({ message: 'Gagal menghubungi AI. Coba lagi.' });
     }
 
