@@ -158,6 +158,12 @@
     </div>
   </div>
   <div class="profile-dropdown-divider"></div>
+  <button class="profile-dropdown-theme" id="themeToggleBtn" onclick="toggleTheme()">
+    <span id="themeToggleIcon">☀️</span>
+    <span id="themeToggleLabel">Mode Terang</span>
+    <span class="theme-toggle-switch" id="themeToggleSwitch"></span>
+  </button>
+  <div class="profile-dropdown-divider"></div>
   <button class="profile-dropdown-logout" onclick="closeProfileDropdown(); logoutUser()">
     <span>🚪</span> Keluar
   </button>
@@ -1409,6 +1415,34 @@ document.addEventListener('keydown', function(e) {
 </script>
 <!-- ===== END PREVENT ZOOM ===== -->
 
+
+<!-- ===== LIGHT / DARK MODE ===== -->
+<script>
+(function () {
+  // Terapkan tema tersimpan saat halaman dimuat
+  const saved = localStorage.getItem('qrents-theme');
+  if (saved === 'light') {
+    document.body.classList.add('light-mode');
+  }
+  updateThemeUI();
+
+  function updateThemeUI() {
+    const isLight = document.body.classList.contains('light-mode');
+    const icon  = document.getElementById('themeToggleIcon');
+    const label = document.getElementById('themeToggleLabel');
+    if (icon)  icon.textContent  = isLight ? '🌙' : '☀️';
+    if (label) label.textContent = isLight ? 'Mode Gelap' : 'Mode Terang';
+  }
+
+  window.toggleTheme = function () {
+    document.body.classList.toggle('light-mode');
+    const isLight = document.body.classList.contains('light-mode');
+    localStorage.setItem('qrents-theme', isLight ? 'light' : 'dark');
+    updateThemeUI();
+  };
+})();
+</script>
+<!-- ===== END LIGHT / DARK MODE ===== -->
 
 <!-- ===== AUTO TENANT END DATE ===== -->
 <script>

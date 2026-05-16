@@ -1662,3 +1662,116 @@ form { padding: 20px 24px; }
   color: var(--green);
   font-size: 16px;
 }
+/* ===== LIGHT MODE ===== */
+body.light-mode {
+  --bg: #f4f5f7;
+  --bg2: #ffffff;
+  --bg3: #eef0f4;
+  --border: #dde1eb;
+  --text: #1a1e2e;
+  --text2: #5a607a;
+  --text3: #9099b4;
+  --accent: #b8922e;
+  --accent2: #a07820;
+  --gold: #b8922e;
+  --gold-dim: #fdf3dc;
+  --green-dim: #d4f5e7;
+  --red-dim: #fde8e8;
+  --blue-dim: #dbeafe;
+  --shadow: 0 4px 24px rgba(0,0,0,0.10);
+}
+
+body.light-mode .nav-item.active {
+  background: linear-gradient(135deg, rgba(184,146,46,0.14), rgba(184,146,46,0.06));
+  color: var(--accent);
+  border: 1px solid rgba(184,146,46,0.22);
+}
+
+body.light-mode .stat-card:hover {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.10);
+}
+
+body.light-mode .modal-backdrop {
+  background: rgba(20,24,40,0.5);
+}
+
+body.light-mode .fab-menu-overlay {
+  background: rgba(20,24,40,0.35);
+}
+
+body.light-mode input,
+body.light-mode select,
+body.light-mode textarea {
+  background: var(--bg3);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+body.light-mode input:focus,
+body.light-mode select:focus,
+body.light-mode textarea:focus {
+  border-color: var(--gold);
+}
+
+body.light-mode .payment-item:hover {
+  background: rgba(0,0,0,0.03);
+}
+
+body.light-mode ::-webkit-scrollbar-track { background: var(--bg3); }
+body.light-mode ::-webkit-scrollbar-thumb { background: var(--border); }
+
+/* ===== PROFILE DROPDOWN THEME TOGGLE BUTTON ===== */
+.profile-dropdown-theme {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 13px 16px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.profile-dropdown-theme:hover,
+.profile-dropdown-theme:active {
+  background: var(--bg3);
+}
+
+.theme-toggle-switch {
+  margin-left: auto;
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--border);
+  position: relative;
+  transition: background 0.22s;
+  flex-shrink: 0;
+}
+
+.theme-toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.22s cubic-bezier(0.4,0,0.2,1), background 0.22s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+
+body.light-mode .theme-toggle-switch {
+  background: var(--gold);
+}
+
+body.light-mode .theme-toggle-switch::after {
+  transform: translateX(16px);
+  background: #fff;
+}
+/* ===== END LIGHT MODE ===== */
