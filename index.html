@@ -119,8 +119,8 @@
     <a href="#" class="nav-item" data-page="reports">
       <span class="nav-icon">📊</span><span>Laporan</span>
     </a>
-    <a href="#" class="nav-item" data-page="ai-chat">
-      <span class="nav-icon">🤖</span><span>AI Chat</span>
+    <a href="#" class="nav-item" data-page="reminders">
+      <span class="nav-icon">🔔</span><span>Pengingat</span>
     </a>
   </nav>
 
@@ -632,49 +632,28 @@
     </div>
   </section>
 
-  <!-- ===== AI CHAT PAGE ===== -->
-  <section class="page" id="page-ai-chat">
+  <!-- ===== REMINDERS PAGE ===== -->
+  <section class="page" id="page-reminders">
     <div class="page-header">
       <div>
-        <h1 class="page-title">AI Chat</h1>
-        <p class="page-subtitle">Tanya apa saja tentang keuangan & properti Anda</p>
+        <h1 class="page-title">Pengingat</h1>
+        <p class="page-subtitle">Jatuh tempo sewa, cicilan, dan tagihan</p>
       </div>
-      <button class="btn btn-outline btn-sm" onclick="clearAiChat()">🗑 Hapus Riwayat</button>
+      <button class="btn btn-outline btn-sm" onclick="renderReminders()" style="border-color:var(--accent);color:var(--accent);">↻ Perbarui</button>
     </div>
 
-    <!-- Suggestion chips -->
-    <div class="ai-suggestions" id="aiSuggestions">
-      <button class="ai-chip" onclick="sendAiSuggestion(this)">Properti mana yang paling untung?</button>
-      <button class="ai-chip" onclick="sendAiSuggestion(this)">Berapa total pendapatan bulan ini?</button>
-      <button class="ai-chip" onclick="sendAiSuggestion(this)">Penyewa mana yang kontraknya mau habis?</button>
-      <button class="ai-chip" onclick="sendAiSuggestion(this)">Ringkasan keuangan bulan ini</button>
-      <button class="ai-chip" onclick="sendAiSuggestion(this)">Pengeluaran terbesar bulan ini apa?</button>
+    <!-- Summary badges -->
+    <div class="reminder-summary" id="reminderSummary"></div>
+
+    <!-- Tabs -->
+    <div class="reminder-tabs">
+      <button class="reminder-tab active" data-tab="all" onclick="switchReminderTab('all', this)">Semua</button>
+      <button class="reminder-tab" data-tab="tenants" onclick="switchReminderTab('tenants', this)">Penyewa</button>
+      <button class="reminder-tab" data-tab="cicilan" onclick="switchReminderTab('cicilan', this)">Cicilan</button>
+      <button class="reminder-tab" data-tab="done" onclick="switchReminderTab('done', this)">Selesai</button>
     </div>
 
-    <!-- Chat messages -->
-    <div class="ai-chat-box" id="aiChatBox">
-      <div class="ai-msg ai-msg-bot">
-        <div class="ai-msg-avatar">🤖</div>
-        <div class="ai-msg-bubble">
-          Halo! Saya asisten keuangan Anda. Tanya apa saja seputar properti, penyewa, pendapatan, atau pengeluaran Anda. 😊
-        </div>
-      </div>
-    </div>
-
-    <!-- Input area -->
-    <div class="ai-input-bar">
-      <textarea
-        id="aiInput"
-        class="ai-input"
-        placeholder="Tulis pertanyaan Anda..."
-        rows="1"
-        onkeydown="onAiInputKeydown(event)"
-        oninput="autoResizeAiInput(this)"
-      ></textarea>
-      <button class="ai-send-btn" id="aiSendBtn" onclick="sendAiMessage()">
-        <span id="aiSendIcon">➤</span>
-      </button>
-    </div>
+    <div id="reminderList" class="reminder-list"></div>
   </section>
 </main>
 
@@ -1195,9 +1174,10 @@
     <span class="bnav-icon">👤</span>
     <span class="bnav-label">Penyewa</span>
   </div>
-  <div class="bottom-nav-item" data-page="reports" onclick="navigateTo('reports'); setActiveBottomNav(this)">
-    <span class="bnav-icon">📊</span>
-    <span class="bnav-label">Laporan</span>
+  <div class="bottom-nav-item" data-page="reminders" onclick="navigateTo('reminders'); setActiveBottomNav(this)" id="bottomNavReminders">
+    <span class="bnav-icon">🔔</span>
+    <span class="bnav-label">Pengingat</span>
+    <span class="bnav-badge" id="bnav-reminder-badge" style="display:none">0</span>
   </div>
 </nav>
 
@@ -1247,11 +1227,11 @@
       <div class="fab-menu-sub">Tambah unit properti</div>
     </div>
   </button>
-  <button class="fab-menu-item" onclick="hideFabMenu(); navigateTo('ai-chat')">
-    <span class="fab-menu-icon accent-gold-icon">🤖</span>
+  <button class="fab-menu-item" onclick="hideFabMenu(); navigateTo('reminders')">
+    <span class="fab-menu-icon accent-gold-icon">🔔</span>
     <div>
-      <div class="fab-menu-label">AI Chat</div>
-      <div class="fab-menu-sub">Tanya asisten keuangan</div>
+      <div class="fab-menu-label">Pengingat</div>
+      <div class="fab-menu-sub">Cek jatuh tempo</div>
     </div>
   </button>
 </div>

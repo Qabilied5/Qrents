@@ -50,7 +50,7 @@ function navigateTo(pageId) {
   }
   if (pageId === 'reports') renderReports();
   if (pageId === 'cicilan') { populateCicilanFilters(); renderCicilan(); }
-  if (pageId === 'ai-chat') initAiChat();
+  if (pageId === 'reminders') renderReminders();
 
   // Close sidebar on mobile
   if (window.innerWidth <= 768) {
@@ -2108,6 +2108,8 @@ function initApp() {
   });
 
   navigateTo('dashboard');
+  // Pre-load reminder badge count
+  setTimeout(renderReminders, 1200);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2121,188 +2123,249 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// ========== AI CHAT ==========
-let aiChatHistory = []; // [{role:'user'|'assistant', content:'...'}]
-let aiChatInitialized = false;
+// ========== REMINDERS ==========
+// localStorage key for dismissed reminders
+const REMINDER_DISMISSED_KEY = 'qrents-dismissed-reminders';
 
-function initAiChat() {
-  // Scroll to bottom when page is opened
-  const box = document.getElementById('aiChatBox');
-  if (box) setTimeout(() => { box.scrollTop = box.scrollHeight; }, 100);
+function getDismissedReminders() {
+  try { return JSON.parse(localStorage.getItem(REMINDER_DISMISSED_KEY) || '[]'); } catch { return []; }
 }
 
-async function buildAiContext() {
-  try {
-    const now = new Date();
-    const since30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+function dismissReminder(id) {
+  const dismissed = getDismissedReminders();
+  if (!dismissed.includes(id)) dismissed.push(id);
+  localStorage.setItem(REMINDER_DISMISSED_KEY, JSON.stringify(dismissed));
+  renderReminders();
+}
 
-    // Fetch semua dengan fallback [] supaya satu gagal tidak crash semua
+function undismissReminder(id) {
+  let dismissed = getDismissedReminders();
+  dismissed = dismissed.filter(d => d !== id);
+  localStorage.setItem(REMINDER_DISMISSED_KEY, JSON.stringify(dismissed));
+  renderReminders();
+}
+
+function clearAllDismissed() {
+  localStorage.removeItem(REMINDER_DISMISSED_KEY);
+  renderReminders();
+}
+
+let _reminderTab = 'all';
+function switchReminderTab(tab, btn) {
+  _reminderTab = tab;
+  document.querySelectorAll('.reminder-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderReminderList(window._lastReminders || [], tab);
+}
+
+async function renderReminders() {
+  const list = document.getElementById('reminderList');
+  const summary = document.getElementById('reminderSummary');
+  if (!list) return;
+  list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-title">Memuat pengingat...</div></div>';
+
+  try {
     const safeGet = async (path) => { try { return await API.get(path); } catch(e) { return []; } };
-    const [properties, tenants, allIncome, allExpenses, allIntIncomes, allIntExpenses] = await Promise.all([
-      safeGet('/properties'),
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const in7  = new Date(now); in7.setDate(in7.getDate() + 7);
+    const in14 = new Date(now); in14.setDate(in14.getDate() + 14);
+    const in30 = new Date(now); in30.setDate(in30.getDate() + 30);
+
+    const [tenants, cicilans] = await Promise.all([
       safeGet('/tenants'),
-      safeGet('/income'),
-      safeGet('/expenses'),
-      safeGet('/internal-incomes'),
-      safeGet('/internal-expenses'),
+      safeGet('/cicilan'),
     ]);
 
-    const curMonth = now.getMonth();
-    const curYear  = now.getFullYear();
-    const inThisMonth = (dateStr) => {
-      const d = new Date(dateStr);
-      return d.getMonth() === curMonth && d.getFullYear() === curYear;
-    };
-    const inLast30 = (dateStr) => new Date(dateStr) >= since30;
+    const reminders = [];
 
-    const totalIncomeMonth  = allIncome.filter(i => inThisMonth(i.date)).reduce((s, i) => s + i.amount, 0)
-                            + allIntIncomes.filter(i => inThisMonth(i.date)).reduce((s, i) => s + i.amount, 0);
-    const totalExpenseMonth = allExpenses.filter(i => inThisMonth(i.date)).reduce((s, i) => s + i.amount, 0)
-                            + allIntExpenses.filter(i => inThisMonth(i.date)).reduce((s, i) => s + i.amount, 0);
+    // ── Tenant reminders ──
+    tenants.forEach(t => {
+      const end = t.end ? new Date(t.end) : null;
+      if (!end) return;
+      end.setHours(0, 0, 0, 0);
+      const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+      let urgency = null;
+      if (daysLeft < 0)       urgency = 'overdue';
+      else if (daysLeft <= 7) urgency = 'critical';
+      else if (daysLeft <= 14) urgency = 'warning';
+      else if (daysLeft <= 30) urgency = 'info';
+      if (urgency === null) return;
 
-    return {
-      properties,
-      tenants,
-      recentIncome:      allIncome.filter(i => inLast30(i.date)),
-      recentExpenses:    allExpenses.filter(i => inLast30(i.date)),
-      recentIntIncomes:  allIntIncomes.filter(i => inLast30(i.date)),
-      recentIntExpenses: allIntExpenses.filter(i => inLast30(i.date)),
-      summary: {
-        totalIncomeMonth,
-        totalExpenseMonth,
-        profitMonth:  totalIncomeMonth - totalExpenseMonth,
-        occupied:     properties.filter(p => p.status === 'terisi').length,
-        totalProps:   properties.length,
-      }
-    };
-  } catch (e) {
-    console.error('buildAiContext error:', e);
-    return {};
-  }
-}
+      const label = daysLeft < 0
+        ? `Kontrak berakhir ${Math.abs(daysLeft)} hari lalu`
+        : daysLeft === 0
+          ? 'Kontrak berakhir hari ini!'
+          : `Kontrak berakhir ${daysLeft} hari lagi`;
 
-function appendAiMessage(role, text) {
-  const box = document.getElementById('aiChatBox');
-  if (!box) return;
-
-  const isBot   = role === 'assistant';
-  const wrapper = document.createElement('div');
-  wrapper.className = `ai-msg ${isBot ? 'ai-msg-bot' : 'ai-msg-user'}`;
-
-  // Simple markdown: **bold**, newlines
-  const formatted = text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n/g, '<br>');
-
-  wrapper.innerHTML = isBot
-    ? `<div class="ai-msg-avatar">🤖</div><div class="ai-msg-bubble">${formatted}</div>`
-    : `<div class="ai-msg-bubble">${formatted}</div>`;
-
-  box.appendChild(wrapper);
-  box.scrollTop = box.scrollHeight;
-
-  // Hide suggestion chips after first user message
-  if (role === 'user') {
-    const chips = document.getElementById('aiSuggestions');
-    if (chips) chips.style.display = 'none';
-  }
-}
-
-function showAiTyping() {
-  const box = document.getElementById('aiChatBox');
-  if (!box) return;
-  const el = document.createElement('div');
-  el.className = 'ai-msg ai-msg-bot';
-  el.id = 'aiTypingIndicator';
-  el.innerHTML = `<div class="ai-msg-avatar">🤖</div><div class="ai-msg-bubble ai-typing"><span></span><span></span><span></span></div>`;
-  box.appendChild(el);
-  box.scrollTop = box.scrollHeight;
-}
-
-function removeAiTyping() {
-  const el = document.getElementById('aiTypingIndicator');
-  if (el) el.remove();
-}
-
-async function sendAiMessage() {
-  const input   = document.getElementById('aiInput');
-  const sendBtn = document.getElementById('aiSendBtn');
-  const text    = input?.value.trim();
-  if (!text) return;
-
-  // Disable input while processing
-  input.value = '';
-  input.style.height = 'auto';
-  input.disabled = true;
-  sendBtn.disabled = true;
-
-  // Show user message
-  appendAiMessage('user', text);
-  aiChatHistory.push({ role: 'user', content: text });
-
-  // Show typing indicator
-  showAiTyping();
-
-  try {
-    const context = await buildAiContext();
-
-    const res = await fetch(`${API_URL}/chat`, {
-      method: 'POST',
-      headers: getAuthHeader(),
-      body: JSON.stringify({
-        messages: aiChatHistory,
-        context,
-      }),
+      reminders.push({
+        id: `tenant-${t._id}`,
+        type: 'tenants',
+        urgency,
+        title: t.name,
+        subtitle: t.propertyId?.name || '—',
+        label,
+        daysLeft,
+        date: t.end,
+        meta: `Sewa: ${fmt(t.rent)}/bln`,
+        action: () => navigateTo('tenants'),
+        actionLabel: '→ Lihat Penyewa',
+      });
     });
 
-    removeAiTyping();
+    // ── Cicilan reminders ──
+    (cicilans || []).forEach(c => {
+      if (c.status === 'lunas') return;
+      const payments = c.payments || [];
+      const paid = payments.reduce((s, p) => s + p.amount, 0);
+      const remaining = (c.totalAmount || 0) - paid;
+      if (remaining <= 0) return;
 
-    if (!res.ok) {
-      const err = await res.json();
-      appendAiMessage('assistant', `⚠️ ${err.message || 'Terjadi kesalahan. Coba lagi.'}`);
-    } else {
-      const data = await res.json();
-      appendAiMessage('assistant', data.reply);
-      aiChatHistory.push({ role: 'assistant', content: data.reply });
+      // Find next due: cicilan start date each month
+      const start = new Date(c.date);
+      let nextDue = new Date(now.getFullYear(), now.getMonth(), start.getDate());
+      if (nextDue < now) nextDue.setMonth(nextDue.getMonth() + 1);
+      const daysLeft = Math.ceil((nextDue - now) / (1000 * 60 * 60 * 24));
+
+      let urgency = null;
+      if (daysLeft < 0)        urgency = 'overdue';
+      else if (daysLeft <= 3)  urgency = 'critical';
+      else if (daysLeft <= 7)  urgency = 'warning';
+      else if (daysLeft <= 14) urgency = 'info';
+      if (urgency === null) return;
+
+      const label = daysLeft < 0
+        ? `Jatuh tempo ${Math.abs(daysLeft)} hari lalu`
+        : daysLeft === 0
+          ? 'Jatuh tempo hari ini!'
+          : `Jatuh tempo ${daysLeft} hari lagi`;
+
+      reminders.push({
+        id: `cicilan-${c._id}`,
+        type: 'cicilan',
+        urgency,
+        title: c.name,
+        subtitle: c.category || '—',
+        label,
+        daysLeft,
+        date: nextDue.toISOString().split('T')[0],
+        meta: `Cicilan: ${fmt(c.monthlyAmount || 0)}/bln · Sisa: ${fmt(remaining)}`,
+        action: () => navigateTo('cicilan'),
+        actionLabel: '→ Lihat Cicilan',
+      });
+    });
+
+    // Sort by urgency then daysLeft
+    const urgencyOrder = { overdue: 0, critical: 1, warning: 2, info: 3 };
+    reminders.sort((a, b) => {
+      if (urgencyOrder[a.urgency] !== urgencyOrder[b.urgency])
+        return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+      return a.daysLeft - b.daysLeft;
+    });
+
+    window._lastReminders = reminders;
+
+    // Update badge
+    const dismissed = getDismissedReminders();
+    const activeCount = reminders.filter(r => !dismissed.includes(r.id)).length;
+    const badge = document.getElementById('bnav-reminder-badge');
+    if (badge) {
+      badge.textContent = activeCount;
+      badge.style.display = activeCount > 0 ? 'flex' : 'none';
     }
+
+    // Render summary
+    if (summary) {
+      const overdue  = reminders.filter(r => r.urgency === 'overdue').length;
+      const critical = reminders.filter(r => r.urgency === 'critical').length;
+      const warning  = reminders.filter(r => r.urgency === 'warning').length;
+      const info     = reminders.filter(r => r.urgency === 'info').length;
+
+      summary.innerHTML = `
+        ${overdue  > 0 ? `<div class="reminder-badge reminder-badge-overdue">⚠ ${overdue} Terlambat</div>` : ''}
+        ${critical > 0 ? `<div class="reminder-badge reminder-badge-critical">🔴 ${critical} Kritis (&le;3hr)</div>` : ''}
+        ${warning  > 0 ? `<div class="reminder-badge reminder-badge-warning">🟡 ${warning} Segera (&le;7hr)</div>` : ''}
+        ${info     > 0 ? `<div class="reminder-badge reminder-badge-info">🔵 ${info} Perhatikan (&le;14hr)</div>` : ''}
+        ${reminders.length === 0 ? '<div class="reminder-badge reminder-badge-ok">✅ Semua aman</div>' : ''}
+      `;
+    }
+
+    renderReminderList(reminders, _reminderTab);
+
   } catch (err) {
-    removeAiTyping();
-    appendAiMessage('assistant', '⚠️ Tidak dapat terhubung ke server. Periksa koneksi Anda.');
-  } finally {
-    input.disabled = false;
-    sendBtn.disabled = false;
-    input.focus();
+    if (list) list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">❌</div><div class="empty-state-title">Gagal memuat pengingat</div><div class="empty-state-sub">${err.message}</div></div>`;
   }
 }
 
-function sendAiSuggestion(btn) {
-  const input = document.getElementById('aiInput');
-  if (!input) return;
-  input.value = btn.textContent;
-  sendAiMessage();
-}
+function renderReminderList(reminders, tab) {
+  const list = document.getElementById('reminderList');
+  if (!list) return;
 
-function onAiInputKeydown(e) {
-  // Enter kirim, Shift+Enter baris baru
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendAiMessage();
+  const dismissed = getDismissedReminders();
+  let filtered;
+  if (tab === 'done') {
+    filtered = reminders.filter(r => dismissed.includes(r.id));
+  } else if (tab === 'all') {
+    filtered = reminders.filter(r => !dismissed.includes(r.id));
+  } else {
+    filtered = reminders.filter(r => r.type === tab && !dismissed.includes(r.id));
   }
-}
 
-function autoResizeAiInput(el) {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-}
+  if (filtered.length === 0) {
+    const msgs = {
+      all: 'Tidak ada pengingat aktif 🎉',
+      tenants: 'Tidak ada penyewa yang akan jatuh tempo',
+      cicilan: 'Tidak ada cicilan yang akan jatuh tempo',
+      done: 'Belum ada pengingat yang diselesaikan',
+    };
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${tab === 'done' ? '📋' : '✅'}</div><div class="empty-state-title">${msgs[tab]}</div></div>`;
+    return;
+  }
 
-function clearAiChat() {
-  aiChatHistory = [];
-  const box = document.getElementById('aiChatBox');
-  if (box) box.innerHTML = `
-    <div class="ai-msg ai-msg-bot">
-      <div class="ai-msg-avatar">🤖</div>
-      <div class="ai-msg-bubble">Halo! Saya asisten keuangan Anda. Tanya apa saja seputar properti, penyewa, pendapatan, atau pengeluaran Anda. 😊</div>
-    </div>`;
-  const chips = document.getElementById('aiSuggestions');
-  if (chips) chips.style.display = '';
+  const urgencyColors = { overdue: 'var(--red)', critical: 'var(--red)', warning: 'var(--gold)', info: 'var(--blue)' };
+  const urgencyLabels = { overdue: 'TERLAMBAT', critical: 'KRITIS', warning: 'SEGERA', info: 'PERHATIAN' };
+  const typeIcons = { tenants: '👤', cicilan: '💳' };
+
+  list.innerHTML = filtered.map(r => {
+    const isDone = dismissed.includes(r.id);
+    const color = urgencyColors[r.urgency];
+    return `
+      <div class="reminder-card reminder-${r.urgency} ${isDone ? 'reminder-done' : ''}">
+        <div class="reminder-card-accent" style="background:${color}"></div>
+        <div class="reminder-card-body">
+          <div class="reminder-card-top">
+            <div class="reminder-card-left">
+              <span class="reminder-type-icon">${typeIcons[r.type]}</span>
+              <div>
+                <div class="reminder-card-title">${r.title}</div>
+                <div class="reminder-card-subtitle">${r.subtitle}</div>
+              </div>
+            </div>
+            <span class="reminder-urgency-badge" style="background:${color}22;color:${color};border-color:${color}44">${urgencyLabels[r.urgency]}</span>
+          </div>
+          <div class="reminder-card-info">
+            <span class="reminder-label" style="color:${color}">⏰ ${r.label}</span>
+            <span class="reminder-meta">${r.meta}</span>
+          </div>
+          <div class="reminder-card-date">Tanggal: ${fmtDate(r.date)}</div>
+          <div class="reminder-card-actions">
+            ${!isDone
+              ? `<button class="reminder-btn-dismiss" onclick="dismissReminder('${r.id}')">✓ Tandai Selesai</button>`
+              : `<button class="reminder-btn-undo" onclick="undismissReminder('${r.id}')">↩ Batalkan</button>`
+            }
+            <button class="reminder-btn-goto" onclick="(${r.action.toString()})()">${r.actionLabel}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // If on 'done' tab, show clear all button
+  if (tab === 'done' && filtered.length > 0) {
+    list.innerHTML += `
+      <div style="text-align:center;margin-top:16px;">
+        <button class="btn btn-outline btn-sm" onclick="clearAllDismissed()" style="color:var(--red);border-color:var(--red);">🗑 Hapus Semua Riwayat Selesai</button>
+      </div>
+    `;
+  }
 }
