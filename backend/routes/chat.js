@@ -1,22 +1,20 @@
-// routes/chat.js — Gemini API
-const express = require('express');
-const router  = express.Router();
-const auth    = require('../middleware/auth');
-const https   = require('https');
+// routes/chat.js — AI Chatbot, context: Cicilan + Kas Keluar
+const express  = require('express');
+const router   = express.Router();
+const auth     = require('../middleware/auth');
+const https    = require('https');
 
+// ─── HTTP helper ─────────────────────────────────────────────────────────────
 function httpsPost(url, body) {
   return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const data   = JSON.stringify(body);
+    const parsed  = new URL(url);
+    const data    = JSON.stringify(body);
     const options = {
       hostname: parsed.hostname,
       path:     parsed.pathname + parsed.search,
       method:   'POST',
-      headers: {
-        'Content-Type':   'application/json',
-        'Content-Length': Buffer.byteLength(data),
-      },
-      timeout: 25000,
+      headers:  { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      timeout:  25000,
     };
     const req = https.request(options, (res) => {
       let raw = '';
@@ -30,111 +28,115 @@ function httpsPost(url, body) {
   });
 }
 
-// GET /api/chat/test — debug tanpa auth
+// ─── Load models ─────────────────────────────────────────────────────────────
+let _models = null;
+function getModels() {
+  if (_models) return _models;
+  _models = {
+    Cicilan:         require('../models/Cicilan'),
+    InternalExpense: require('../models/InternalExpense'),
+  };
+  return _models;
+}
+
+// ─── Build systemPrompt ───────────────────────────────────────────────────────
+function buildPrompt(cicilan, kasKeluar) {
+  const fmt  = (n) => (n || 0).toLocaleString('id-ID');
+  const date = (d) => new Date(d).toLocaleDateString('id-ID');
+
+  // Cicilan: hitung sisa & status tiap item
+  const cicilanText = cicilan.length
+    ? cicilan.map(c => {
+        const totalBayar = (c.payments || []).reduce((s, p) => s + p.amount, 0);
+        const sisaAmount = c.totalAmount - totalBayar;
+        const bulanBayar = (c.payments || []).length;
+        const sisaBulan  = c.totalBulan - bulanBayar;
+        const status     = sisaBulan <= 0 ? 'LUNAS' : `sisa ${sisaBulan} bln (Rp ${fmt(sisaAmount)})`;
+        return `- ${c.name} | ${c.category || '-'} | Total: Rp ${fmt(c.totalAmount)} | Cicilan: Rp ${fmt(c.bulanan)}/bln | ${status}`;
+      }).join('\n')
+    : 'Tidak ada data cicilan.';
+
+  // Kas Keluar: 30 hari terakhir
+  const kasText = kasKeluar.length
+    ? kasKeluar.map(k =>
+        `- ${date(k.date)} | ${k.category || '-'} | ${k.name} | Rp ${fmt(k.amount)}${k.note ? ' | ' + k.note : ''}`
+      ).join('\n')
+    : 'Tidak ada kas keluar 30 hari terakhir.';
+
+  // Ringkasan kas keluar bulan ini
+  const now        = new Date();
+  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const totalKasBulan = kasKeluar
+    .filter(k => new Date(k.date) >= startMonth)
+    .reduce((s, k) => s + k.amount, 0);
+
+  // Ringkasan cicilan aktif
+  const cicilanAktif  = cicilan.filter(c => (c.payments || []).length < c.totalBulan);
+  const totalCicilan  = cicilanAktif.reduce((s, c) => s + c.bulanan, 0);
+
+  return [
+    'Kamu adalah asisten keuangan pribadi untuk aplikasi Qrents Pro (manajemen properti sewa).',
+    'Jawab dalam Bahasa Indonesia, singkat, jelas, langsung ke intinya.',
+    'Format angka sebagai Rp xxx.xxx. Jangan sebut dirimu AI.\n',
+
+    '=== CICILAN ===',
+    cicilanText,
+    `\nTotal kewajiban cicilan/bulan (aktif): Rp ${fmt(totalCicilan)}`,
+    `Jumlah cicilan aktif: ${cicilanAktif.length} dari ${cicilan.length} total\n`,
+
+    '=== KAS KELUAR (30 hari terakhir) ===',
+    kasText,
+    `\nTotal kas keluar bulan ini: Rp ${fmt(totalKasBulan)}`,
+
+    '\nJawab berdasarkan data di atas. Jika data tidak tersedia, katakan "belum ada data".',
+  ].join('\n');
+}
+
+// ─── GET /api/chat/test ──────────────────────────────────────────────────────
 router.get('/test', async (req, res) => {
   const key = process.env.GEMINI_API_KEY;
-  if (!key) return res.json({ ok: false, error: 'GEMINI_API_KEY tidak ditemukan di env' });
+  if (!key) return res.json({ ok: false, error: 'GEMINI_API_KEY tidak ditemukan' });
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' + key;
   try {
     const result = await httpsPost(url, {
-      contents: [{ role: 'user', parts: [{ text: 'Balas dengan kata OK saja' }] }],
-      generationConfig: { maxOutputTokens: 10 }
+      contents: [{ role: 'user', parts: [{ text: 'Balas OK saja' }] }],
+      generationConfig: { maxOutputTokens: 5 }
     });
-    let parsed;
-    try { parsed = JSON.parse(result.text); } catch(e) { parsed = result.text; }
+    let parsed; try { parsed = JSON.parse(result.text); } catch(e) { parsed = result.text; }
     res.json({ httpStatus: result.status, keyPrefix: key.slice(0, 8) + '...', response: parsed });
   } catch (err) {
     res.json({ ok: false, error: err.message });
   }
 });
 
-// POST /api/chat
+// ─── POST /api/chat ──────────────────────────────────────────────────────────
 router.post('/', auth, async (req, res) => {
   try {
     const { messages } = req.body;
-    const context = req.body.context || {};
-
-    if (!messages || !Array.isArray(messages)) {
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ message: 'messages harus berupa array' });
     }
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({ message: 'GEMINI_API_KEY belum dikonfigurasi' });
     }
 
-    const p = (arr) => Array.isArray(arr) ? arr : [];
-    const n = (v)   => (typeof v === 'number' ? v : 0);
+    // Fetch cicilan + kas keluar langsung dari DB
+    const { Cicilan, InternalExpense } = getModels();
+    const userId  = req.userId;
+    const since30 = new Date(); since30.setDate(since30.getDate() - 30);
 
-    const propsText = p(context.properties).length
-      ? p(context.properties).map(p2 =>
-          '- ' + p2.name + ' (' + p2.type + ', ' + p2.status + ') — Sewa: Rp ' +
-          (p2.rent || 0).toLocaleString('id-ID') + ' | Kota: ' + (p2.city || p2.address || '-')
-        ).join('\n')
-      : 'Belum ada data properti.';
+    const [cicilan, kasKeluar] = await Promise.all([
+      Cicilan.find({ userId }).lean(),
+      InternalExpense.find({ userId, date: { $gte: since30 } }).sort({ date: -1 }).lean(),
+    ]);
 
-    const tenantsText = p(context.tenants).length
-      ? p(context.tenants).map(t =>
-          '- ' + t.name + ' -> ' + (t.propertyId?.name || '?') +
-          ' | Sewa: Rp ' + (t.rent || 0).toLocaleString('id-ID') +
-          ' | Kontrak s/d: ' + (t.end ? new Date(t.end).toLocaleDateString('id-ID') : '-')
-        ).join('\n')
-      : 'Belum ada data penyewa.';
-
-    const incomeText = p(context.recentIncome).length
-      ? p(context.recentIncome).map(i =>
-          '- ' + new Date(i.date).toLocaleDateString('id-ID') + ' | ' +
-          (i.propertyId?.name || '?') + ' | ' + i.category +
-          ' | Rp ' + (i.amount || 0).toLocaleString('id-ID') + ' | ' + (i.note || '')
-        ).join('\n')
-      : 'Tidak ada pendapatan 30 hari terakhir.';
-
-    const expText = p(context.recentExpenses).length
-      ? p(context.recentExpenses).map(e =>
-          '- ' + new Date(e.date).toLocaleDateString('id-ID') + ' | ' +
-          (e.propertyId?.name || '?') + ' | ' + e.category +
-          ' | Rp ' + (e.amount || 0).toLocaleString('id-ID') + ' | ' + (e.note || '')
-        ).join('\n')
-      : 'Tidak ada pengeluaran 30 hari terakhir.';
-
-    const intInText = p(context.recentIntIncomes).length
-      ? p(context.recentIntIncomes).map(i =>
-          '- ' + new Date(i.date).toLocaleDateString('id-ID') + ' | ' +
-          i.category + ' | ' + i.name + ' | Rp ' + (i.amount || 0).toLocaleString('id-ID')
-        ).join('\n')
-      : 'Tidak ada kas masuk 30 hari terakhir.';
-
-    const intOutText = p(context.recentIntExpenses).length
-      ? p(context.recentIntExpenses).map(i =>
-          '- ' + new Date(i.date).toLocaleDateString('id-ID') + ' | ' +
-          i.category + ' | ' + i.name + ' | Rp ' + (i.amount || 0).toLocaleString('id-ID')
-        ).join('\n')
-      : 'Tidak ada kas keluar 30 hari terakhir.';
-
-    const s = context.summary || {};
-
-    const systemPrompt =
-      'Kamu adalah asisten keuangan pribadi untuk aplikasi Qrents Pro — aplikasi manajemen properti sewa.\n' +
-      'Jawab dalam Bahasa Indonesia, singkat, jelas, dan langsung ke intinya.\n' +
-      'Jika ditanya soal angka, tampilkan dalam format Rupiah (Rp xxx.xxx).\n' +
-      'Jangan menyebutkan bahwa kamu AI atau model bahasa — cukup jawab pertanyaannya.\n\n' +
-      'Berikut adalah DATA AKTUAL milik pengguna saat ini:\n\n' +
-      '=== PROPERTI ===\n' + propsText + '\n\n' +
-      '=== PENYEWA AKTIF ===\n' + tenantsText + '\n\n' +
-      '=== PENDAPATAN (30 hari terakhir) ===\n' + incomeText + '\n\n' +
-      '=== PENGELUARAN (30 hari terakhir) ===\n' + expText + '\n\n' +
-      '=== KAS MASUK (30 hari terakhir) ===\n' + intInText + '\n\n' +
-      '=== KAS KELUAR (30 hari terakhir) ===\n' + intOutText + '\n\n' +
-      '=== RINGKASAN BULAN INI ===\n' +
-      '- Total Pendapatan : Rp ' + n(s.totalIncomeMonth).toLocaleString('id-ID') + '\n' +
-      '- Total Pengeluaran: Rp ' + n(s.totalExpenseMonth).toLocaleString('id-ID') + '\n' +
-      '- Keuntungan Bersih: Rp ' + n(s.profitMonth).toLocaleString('id-ID') + '\n' +
-      '- Properti Terisi  : ' + (s.occupied || 0) + ' dari ' + (s.totalProps || 0) + '\n\n' +
-      'Jawab berdasarkan data di atas. Jika data tidak tersedia, katakan "belum ada data".';
+    const systemPrompt = buildPrompt(cicilan, kasKeluar);
 
     const geminiHistory = messages.slice(0, -1).map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
+      role:  m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
     }));
-    const lastMessage = messages[messages.length - 1];
+    const lastText = messages[messages.length - 1]?.content || '';
 
     const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' + process.env.GEMINI_API_KEY;
 
@@ -142,7 +144,7 @@ router.post('/', auth, async (req, res) => {
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [
         ...geminiHistory,
-        { role: 'user', parts: [{ text: lastMessage.content }] }
+        { role: 'user', parts: [{ text: lastText }] },
       ],
       generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
       safetySettings: [
@@ -167,12 +169,8 @@ router.post('/', auth, async (req, res) => {
     }
 
     let data;
-    try {
-      data = JSON.parse(result.text);
-    } catch(e) {
-      console.error('Gemini JSON parse error:', result.text.slice(0, 300));
-      return res.status(502).json({ message: 'Respons AI tidak valid (parse error)' });
-    }
+    try { data = JSON.parse(result.text); }
+    catch(e) { return res.status(502).json({ message: 'Respons AI tidak valid' }); }
 
     const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Maaf, tidak ada respons dari AI.';
     res.json({ reply });
