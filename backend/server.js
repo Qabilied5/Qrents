@@ -1,8 +1,11 @@
+// server.js
 require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const connectDB = require('./config/db');
-const path = require('path');
+const express        = require('express');
+const cors           = require('cors');
+const session        = require('express-session');
+const passport       = require('passport');
+const connectDB      = require('./config/db');
+const path           = require('path');
 
 const app = express();
 
@@ -10,10 +13,24 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 2. Koneksi Database
+// 2. Session (dibutuhkan Passport untuk OAuth handshake)
+app.use(
+  session({
+    secret:            process.env.JWT_SECRET || 'qrents_session_secret',
+    resave:            false,
+    saveUninitialized: false,
+    cookie:            { secure: process.env.NODE_ENV === 'production', maxAge: 10 * 60 * 1000 },
+  })
+);
+
+// 3. Passport (harus setelah session)
+app.use(passport.initialize());
+app.use(passport.session());
+
+// 4. Koneksi Database
 connectDB();
 
-// 3. Rute API
+// 5. Rute API
 app.use('/api/auth',               require('./routes/auth'));
 app.use('/api/properties',         require('./routes/properties'));
 app.use('/api/tenants',            require('./routes/tenants'));
@@ -21,15 +38,29 @@ app.use('/api/income',             require('./routes/income'));
 app.use('/api/expenses',           require('./routes/expenses'));
 app.use('/api/internal-incomes',   require('./routes/internalIncomes'));
 app.use('/api/internal-expenses',  require('./routes/internalExpenses'));
-app.use('/api/cicilan',            require('./routes/cicilan'));   // ← Cicilan & pembayaran
-app.use('/api/chat',               require('./routes/chat'));       // ← AI Chatbot
+app.use('/api/cicilan',            require('./routes/cicilan'));
+app.use('/api/chat',               require('./routes/chat'));
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK' });
-});
+// Shortcut route agar Google Callback URL yang terdaftar di Google Console
+// (https://qrents.onrender.com/auth/google/callback) tetap berfungsi
+// walaupun API prefix-nya /api/auth
+app.get(
+  '/auth/google/callback',
+  (req, res, next) => {
+    // Forward ke router auth yang sudah terdaftar
+    req.url = '/google/callback';
+    app._router.handle(
+      Object.assign(req, { url: req.url }),
+      res,
+      next
+    );
+  }
+);
 
+app.get('/api/health', (req, res) => res.json({ status: 'OK' }));
+
+// 6. Static & SPA fallback
 app.use(express.static(path.join(__dirname, '../')));
-
 app.get('*', (req, res) => {
   res.sendFile(path.resolve(__dirname, '..', 'index.html'));
 });
