@@ -44,16 +44,37 @@ app.use('/api/chat',               require('./routes/chat'));
 // Shortcut route agar Google Callback URL yang terdaftar di Google Console
 // (https://qrents.onrender.com/auth/google/callback) tetap berfungsi
 // walaupun API prefix-nya /api/auth
+
+
+// USELESS Ah 
+// app.get(
+//   '/auth/google/callback',
+//   (req, res, next) => {
+//     // Forward ke router auth yang sudah terdaftar
+//     req.url = '/google/callback';
+//     app._router.handle(
+//       Object.assign(req, { url: req.url }),
+//       res,
+//       next
+//     );
+//   }
+// );
+
+const jwt = require('jsonwebtoken'); // tambah di atas jika belum ada
+
 app.get(
   '/auth/google/callback',
-  (req, res, next) => {
-    // Forward ke router auth yang sudah terdaftar
-    req.url = '/google/callback';
-    app._router.handle(
-      Object.assign(req, { url: req.url }),
-      res,
-      next
-    );
+  passport.authenticate('google', { failureRedirect: '/?googleError=1', session: false }),
+  (req, res) => {
+    const user  = req.user;
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+    const params = new URLSearchParams({
+      token,
+      name:     user.name,
+      username: user.username,
+      id:       user._id.toString(),
+    });
+    res.redirect(`/?${params.toString()}`);
   }
 );
 
