@@ -1,8 +1,10 @@
 /* Qrents Pro - Service Worker (sw.js) */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME    = `qrents-${CACHE_VERSION}`;
 const API_CACHE     = `qrents-api-${CACHE_VERSION}`;
+
+
 
 // Aset statis yang di-cache saat install
 const STATIC_ASSETS = [
@@ -63,15 +65,15 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (url.protocol === 'chrome-extension:') return;
 
+  if (url.hostname === 'qrents.onrender.com') return;
+
   const isApiCall = API_ORIGINS.some(prefix =>
     url.href.includes(prefix) || url.pathname.startsWith('/api')
   );
 
   if (isApiCall) {
-
     event.respondWith(networkFirst(request, API_CACHE));
   } else {
-
     event.respondWith(cacheFirst(request, CACHE_NAME));
   }
 });
