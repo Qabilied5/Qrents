@@ -137,6 +137,19 @@ function showLoginForm() {
 
 // ===== GOOGLE OAUTH =====
 function loginWithGoogle() {
+
+  const ua = navigator.userAgent || '';
+  const isInAppBrowser = /FBAN|FBAV|Instagram|LinkedIn|Twitter|Line|KAKAOTALK/i.test(ua)
+    || (ua.includes('iPhone') && !ua.includes('Safari'));
+
+  if (isInAppBrowser) {
+    showToast(
+      '⚠️ Buka di browser dulu ya - Google tidak mengizinkan login dari browser LinkedIn/Instagram.',
+      'error'
+    );
+    return;
+  }
+
   window.location.href = 'https://qrents.onrender.com/api/auth/google';
 }
 
