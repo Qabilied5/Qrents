@@ -250,11 +250,10 @@
   const screen   = document.getElementById('server-loading-screen');
   const bar      = document.getElementById('qrentsProgressBar');
   const status   = document.getElementById('qrentsStatus');
-  const PING_URL = '/ping';   // endpoint di server.js kamu
-  const INTERVAL = 2500;      // cek tiap 2.5 detik
-  const TIMEOUT  = 60000;     // maks 60 detik sebelum menyerah
-
-  // Mulai animasi progress bar
+  const PING_URL = 'https://qrents.onrender.com/ping';
+  const INTERVAL = 2000;
+  const TIMEOUT  = 15000;  
+  
   setTimeout(() => bar.classList.add('running'), 100);
 
   let attempts = 0;
