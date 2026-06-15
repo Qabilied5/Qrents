@@ -81,6 +81,231 @@
 </head>
 <body>
 
+<!-- ===== SERVER WAKEUP LOADING SCREEN ===== -->
+<div id="server-loading-screen" style="
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #0f0f13;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+  transition: opacity 0.8s ease, visibility 0.8s ease;
+">
+  <style>
+    @keyframes qrents-pulse-ring {
+      0%   { transform: scale(0.85); opacity: 0.8; }
+      50%  { transform: scale(1.1);  opacity: 0.3; }
+      100% { transform: scale(0.85); opacity: 0.8; }
+    }
+    @keyframes qrents-shimmer {
+      0%   { background-position: -200% center; }
+      100% { background-position:  200% center; }
+    }
+    @keyframes qrents-dot {
+      0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+      40%            { transform: scale(1); opacity: 1;   }
+    }
+    @keyframes qrents-fadein {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+    @keyframes qrents-progress {
+      0%   { width: 0%; }
+      40%  { width: 60%; }
+      80%  { width: 85%; }
+      100% { width: 100%; }
+    }
+    #server-loading-screen.hide {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+    .qrents-logo-wrap {
+      position: relative;
+      width: 90px;
+      height: 90px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+    .qrents-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid #c9a84c44;
+      animation: qrents-pulse-ring 2s ease-in-out infinite;
+    }
+    .qrents-ring-2 {
+      inset: -12px;
+      border-color: #c9a84c22;
+      animation-delay: 0.4s;
+    }
+    .qrents-logo-inner {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #1e1e2a 0%, #2a2a3a 100%);
+      border: 1.5px solid #c9a84c55;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      box-shadow: 0 0 40px #c9a84c22, inset 0 1px 0 #c9a84c33;
+      position: relative;
+      z-index: 1;
+    }
+    .qrents-title-shimmer {
+      font-family: 'Playfair Display', serif;
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #c9a84c 0%, #f0d080 40%, #c9a84c 60%, #a07830 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: qrents-shimmer 2.5s linear infinite, qrents-fadein 0.6s ease both;
+      margin-bottom: 4px;
+    }
+    .qrents-subtitle {
+      color: #8b90a4;
+      font-size: 0.82rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      animation: qrents-fadein 0.6s 0.2s ease both;
+      margin-bottom: 48px;
+    }
+    .qrents-progress-wrap {
+      width: 220px;
+      height: 3px;
+      background: #1e1e2a;
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      animation: qrents-fadein 0.6s 0.4s ease both;
+    }
+    .qrents-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #c9a84c, #f0d080);
+      border-radius: 99px;
+      width: 0%;
+    }
+    .qrents-progress-bar.running {
+      animation: qrents-progress 8s ease-out forwards;
+    }
+    .qrents-status {
+      color: #8b90a4;
+      font-size: 0.78rem;
+      animation: qrents-fadein 0.6s 0.5s ease both;
+      min-height: 18px;
+      transition: color 0.3s;
+    }
+    .qrents-status.ready {
+      color: #6fcf97;
+    }
+    .qrents-dots {
+      display: flex;
+      gap: 6px;
+      margin-top: 20px;
+      animation: qrents-fadein 0.6s 0.6s ease both;
+    }
+    .qrents-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #c9a84c;
+      animation: qrents-dot 1.4s ease-in-out infinite both;
+    }
+    .qrents-dot:nth-child(1) { animation-delay: 0s;    }
+    .qrents-dot:nth-child(2) { animation-delay: 0.16s; }
+    .qrents-dot:nth-child(3) { animation-delay: 0.32s; }
+  </style>
+
+  <div class="qrents-logo-wrap">
+    <div class="qrents-ring"></div>
+    <div class="qrents-ring qrents-ring-2"></div>
+    <div class="qrents-logo-inner">🏠</div>
+  </div>
+
+  <div class="qrents-title-shimmer">Qrents</div>
+  <div class="qrents-subtitle">Pro Dashboard</div>
+
+  <div class="qrents-progress-wrap">
+    <div class="qrents-progress-bar" id="qrentsProgressBar"></div>
+  </div>
+  <div class="qrents-status" id="qrentsStatus">Membangunkan server…</div>
+
+  <div class="qrents-dots">
+    <div class="qrents-dot"></div>
+    <div class="qrents-dot"></div>
+    <div class="qrents-dot"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const screen   = document.getElementById('server-loading-screen');
+  const bar      = document.getElementById('qrentsProgressBar');
+  const status   = document.getElementById('qrentsStatus');
+  const PING_URL = '/ping';   // endpoint di server.js kamu
+  const INTERVAL = 2500;      // cek tiap 2.5 detik
+  const TIMEOUT  = 60000;     // maks 60 detik sebelum menyerah
+
+  // Mulai animasi progress bar
+  setTimeout(() => bar.classList.add('running'), 100);
+
+  let attempts = 0;
+  let resolved = false;
+
+  function dismiss() {
+    if (resolved) return;
+    resolved = true;
+    status.textContent  = 'Server siap! Memuat aplikasi…';
+    status.classList.add('ready');
+    bar.style.animation = 'none';
+    bar.style.width     = '100%';
+    bar.style.transition = 'width 0.4s ease';
+    setTimeout(() => {
+      screen.classList.add('hide');
+      // Hapus dari DOM setelah transisi selesai
+      setTimeout(() => screen.remove(), 900);
+    }, 600);
+  }
+
+  async function ping() {
+    attempts++;
+    try {
+      const res = await fetch(PING_URL, { cache: 'no-store' });
+      if (res.ok) { dismiss(); return; }
+    } catch (_) { /* server masih tidur */ }
+
+    if (attempts * INTERVAL >= TIMEOUT) {
+      // Timeout: tetap lanjut masuk ke app, biarkan app yang handle error
+      status.textContent = 'Menghubungkan ke aplikasi…';
+      dismiss();
+      return;
+    }
+
+    // Update pesan tiap beberapa attempt
+    const msgs = [
+      'Menghubungkan ke sistem…',
+      'Menyiapkan enkripsi…',
+      'Sinkronisasi dashboard…',
+      'Memvalidasi data…',
+    ];
+    status.textContent = msgs[Math.min(attempts - 1, msgs.length - 1)];
+    setTimeout(ping, INTERVAL);
+  }
+
+  // Mulai ping setelah 500ms (beri waktu halaman render dulu)
+  setTimeout(ping, 500);
+})();
+</script>
+<!-- ===== END SERVER WAKEUP LOADING SCREEN ===== -->
+
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">

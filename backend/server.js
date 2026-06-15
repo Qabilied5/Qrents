@@ -10,7 +10,11 @@ const path           = require('path');
 const app = express();
 
 // 1. Middleware Utama
-app.use(cors());
+app.use(cors({
+  origin: 'https://proyek-kamu.vercel.app',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}));
 app.use(express.json());
 
 // 2. Session (dibutuhkan Passport untuk OAuth handshake)
@@ -64,7 +68,10 @@ const jwt = require('jsonwebtoken'); // tambah di atas jika belum ada
 
 app.get(
   '/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/?googleError=1', session: false }),
+  passport.authenticate('google', { 
+    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/?googleError=1`, 
+    session: false 
+  }),
   (req, res) => {
     const user  = req.user;
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
@@ -74,7 +81,10 @@ app.get(
       username: user.username,
       id:       user._id.toString(),
     });
-    res.redirect(`/?${params.toString()}`);
+    
+    // Alihkan redirect ke domain Vercel bawaan dari .env
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/?${params.toString()}`);
   }
 );
 
@@ -89,4 +99,10 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✓ Server running on port ${PORT}`);
+});
+
+
+// Endpoint untuk membangunkan server dari sleep (dipanggil oleh loading screen Vercel)
+app.get('/ping', (req, res) => {
+  res.status(200).send('Server Awake!');
 });
