@@ -2259,7 +2259,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// ========== REMINDERS ==========
+// REMINDERS 
 // localStorage key for dismissed reminders
 const REMINDER_DISMISSED_KEY = 'qrents-dismissed-reminders';
 
@@ -2299,7 +2299,6 @@ async function renderReminders() {
   const summary = document.getElementById('reminderSummary');
   if (!list) return;
 
-  // Hapus cache lama agar selalu ambil data terbaru dari server
   window._lastReminders = null;
 
   list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-title">Memuat pengingat...</div></div>';
@@ -2353,7 +2352,7 @@ async function renderReminders() {
       });
     });
 
-    // ── Cicilan reminders ──
+    //  Cicilan reminders 
     (cicilans || []).forEach(c => {
       // Hitung sisa bayar langsung dari data fresh (tidak bergantung pada field status)
       const payments = c.payments || [];

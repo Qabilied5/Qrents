@@ -4,7 +4,7 @@
 
 const API_URL = 'https://qrents.onrender.com/api';
 
-// ===== CAPTCHA & RATE LIMIT CONFIG =====
+//  CAPTCHA & RATE LIMIT CONFIG 
 const REG_COOLDOWN_MS  = 180 * 60 * 1000; // 180 menit
 const REG_MAX_ATTEMPTS = 3;
 let _captchaAnswer = null;
@@ -136,25 +136,13 @@ function showLoginForm() {
 }
 
 // ===== GOOGLE OAUTH =====
-
-/** Mulai alur login Google — redirect ke backend */
-// function loginWithGoogle() {
-//   window.location.href = '/api/auth/google';
-// }
-
 function loginWithGoogle() {
   window.location.href = 'https://qrents.onrender.com/api/auth/google';
 }
 
-/**
- * Dipanggil saat halaman dimuat.
- * Jika URL mengandung ?token=..., berarti redirect balik dari Google OAuth.
- * Simpan token & langsung masuk.
- */
 function handleGoogleCallback() {
   const params = new URLSearchParams(window.location.search);
 
-  // Cek error dari Google
   if (params.get('googleError')) {
     showToast('Login Google gagal. Coba lagi.', 'error');
     history.replaceState({}, '', window.location.pathname);
@@ -162,7 +150,7 @@ function handleGoogleCallback() {
   }
 
   const token = params.get('token');
-  if (!token) return; // bukan callback Google
+  if (!token) return;
 
   const user = {
     id:       params.get('id'),
@@ -170,15 +158,12 @@ function handleGoogleCallback() {
     username: params.get('username'),
   };
 
-  // Simpan persis seperti login biasa
   authToken = token;
   localStorage.setItem('authToken', token);
   localStorage.setItem('currentUser', JSON.stringify(user));
 
-  // Bersihkan URL (hapus query string sensitif)
   history.replaceState({}, '', window.location.pathname);
 
-  // Update UI nama
   const sidebarName = document.getElementById('sidebarUserName');
   if (sidebarName) sidebarName.textContent = user.name;
 
@@ -187,7 +172,7 @@ function handleGoogleCallback() {
 
   if (typeof initApp === 'function') initApp();
 }
-// ===== END GOOGLE OAUTH =====
+//  END GOOGLE OAUTH 
 
 async function loginUser(event) {
   event.preventDefault();
@@ -302,7 +287,6 @@ function fillDemoAccount() {
 }
 
 function initLogin() {
-  // Tangkap callback Google sebelum apapun
   handleGoogleCallback();
 
   const loginForm = document.getElementById('loginForm');

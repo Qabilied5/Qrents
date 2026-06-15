@@ -253,7 +253,7 @@
   const PING_URL = 'https://qrents.onrender.com/ping';
   const INTERVAL = 2000;
   const TIMEOUT  = 15000;  
-  
+
   setTimeout(() => bar.classList.add('running'), 100);
 
   let attempts = 0;
@@ -269,7 +269,6 @@
     bar.style.transition = 'width 0.4s ease';
     setTimeout(() => {
       screen.classList.add('hide');
-      // Hapus dari DOM setelah transisi selesai
       setTimeout(() => screen.remove(), 900);
     }, 600);
   }
@@ -279,16 +278,14 @@
     try {
       const res = await fetch(PING_URL, { cache: 'no-store' });
       if (res.ok) { dismiss(); return; }
-    } catch (_) { /* server masih tidur */ }
+    } catch (_) {}
 
     if (attempts * INTERVAL >= TIMEOUT) {
-      // Timeout: tetap lanjut masuk ke app, biarkan app yang handle error
       status.textContent = 'Menghubungkan ke aplikasi…';
       dismiss();
       return;
     }
 
-    // Update pesan tiap beberapa attempt
     const msgs = [
       'Menghubungkan ke sistem…',
       'Menyiapkan enkripsi…',
@@ -299,11 +296,10 @@
     setTimeout(ping, INTERVAL);
   }
 
-  // Mulai ping setelah 500ms (beri waktu halaman render dulu)
   setTimeout(ping, 500);
 })();
 </script>
-<!-- ===== END SERVER WAKEUP LOADING SCREEN ===== -->
+<!-- END SERVER WAKEUP LOADING SCREEN -->
 
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
