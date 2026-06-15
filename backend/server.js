@@ -11,7 +11,7 @@ const app = express();
 
 // 1. Middleware Utama
 app.use(cors({
-  origin: 'https://proyek-kamu.vercel.app',
+  origin: 'https://qrents.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
@@ -91,10 +91,10 @@ app.get(
 app.get('/api/health', (req, res) => res.json({ status: 'OK' }));
 
 // 6. Static & SPA fallback
-app.use(express.static(path.join(__dirname, '../')));
-app.get('*', (req, res) => {
-  res.sendFile(path.resolve(__dirname, '..', 'index.html'));
-});
+// app.use(express.static(path.join(__dirname, '../')));
+// app.get('*', (req, res) => {
+//   res.sendFile(path.resolve(__dirname, '..', 'index.html'));
+// });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

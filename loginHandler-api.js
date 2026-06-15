@@ -1,6 +1,8 @@
 // loginHandler-api.js
 // const API_URL = 'http://localhost:5000/api';
-const API_URL = '/api';
+// const API_URL =
+
+const API_URL = 'https://qrents.onrender.com/api';
 
 // ===== CAPTCHA & RATE LIMIT CONFIG =====
 const REG_COOLDOWN_MS  = 180 * 60 * 1000; // 180 menit
@@ -136,8 +138,12 @@ function showLoginForm() {
 // ===== GOOGLE OAUTH =====
 
 /** Mulai alur login Google — redirect ke backend */
+// function loginWithGoogle() {
+//   window.location.href = '/api/auth/google';
+// }
+
 function loginWithGoogle() {
-  window.location.href = '/api/auth/google';
+  window.location.href = 'https://qrents.onrender.com/api/auth/google';
 }
 
 /**
